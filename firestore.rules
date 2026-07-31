@@ -1,0 +1,37 @@
+rules_version = '2';
+
+// Règles pour le jeu "Tribu".
+// Le jeu n'utilise pas de compte/mot de passe individuel : la sélection du prénom
+// suffit (comme prévu dans le cahier des charges). Ces règles autorisent donc la
+// lecture et l'écriture à quiconque a le lien de l'application, ce qui est
+// acceptable ici car : (1) le lien n'est envoyé qu'aux joueurs, (2) la partie dure
+// 10 jours, (3) aucune donnée sensible n'est stockée (juste des scores et des
+// textes de mission). Le code PIN admin (457894) protège seulement l'accès aux
+// écrans Tribunal / God Mode côté application, pas la base elle-même.
+//
+// Pense à supprimer le projet Firebase après le séjour si tu veux nettoyer.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /joueurs/{joueurId} {
+      allow read, write: if true;
+    }
+
+    match /missions/{missionId} {
+      allow read, write: if true;
+    }
+
+    match /accusations/{accusationId} {
+      allow read, write: if true;
+    }
+
+    match /journal/{entreeId} {
+      allow read, write: if true;
+    }
+
+    match /systeme/{docId} {
+      allow read, write: if true;
+    }
+  }
+}

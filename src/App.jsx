@@ -21,7 +21,7 @@ const ONGLETS = [
 ];
 
 function AppContent() {
-  const { pseudo, joueur, chargement, deconnecter } = useGame();
+  const { pseudo, joueur, chargement } = useGame();
   const [onglet, setOnglet] = useState('dashboard');
   const [adminDeverrouille, setAdminDeverrouille] = useState(false);
   const [pinOuvert, setPinOuvert] = useState(false);
@@ -93,8 +93,6 @@ function AppContent() {
           </div>
         </div>
       )}
-
-      <button className="btn-lien-discret" onClick={deconnecter}>Changer de joueur</button>
     </div>
   );
 }

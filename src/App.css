@@ -412,14 +412,3 @@
   font-size: 13px;
   text-decoration: underline;
 }
-
-.btn-lien-discret {
-  position: absolute;
-  bottom: 76px;
-  right: 12px;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 11px;
-  opacity: 0.6;
-}

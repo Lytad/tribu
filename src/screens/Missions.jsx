@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { piocherMission, marquerMissionActive, bruleMission, remettreDisponible } from '../firebase/missions';
+import { piocherMission, marquerMissionActive, bruleMission, remettreDisponibleApresAbandon } from '../firebase/missions';
 import { ajusterScore, definirMissionActive, retirerMissionActive, mettreAJourJoueur } from '../firebase/joueurs';
 import { ajouterEntreeJournal } from '../firebase/journal';
 import { POINTS } from '../utils/constants';
@@ -28,7 +28,7 @@ export default function Missions() {
     setErreur(null);
     setChargementAction(true);
     try {
-      const mission = await piocherMission(saison);
+      const mission = await piocherMission(saison, pseudo);
       if (!mission) {
         setErreur("Plus aucune mission disponible pour l'instant dans cette saison.");
         setPropositionCourante(null);
@@ -65,6 +65,7 @@ export default function Missions() {
         difficulte: propositionCourante.difficulte,
         points: propositionCourante.points,
         preuveRequise: propositionCourante.preuveRequise,
+        nombreAbandons: propositionCourante.nombreAbandons || 0,
         effetDeLevier: avecLevier,
         dateAcceptation: new Date().toISOString(),
       });
@@ -118,7 +119,7 @@ export default function Missions() {
         preuveRequise: missionActive.preuveRequise,
         type: 'abandonnee',
       });
-      await remettreDisponible(missionActive.missionId);
+      await remettreDisponibleApresAbandon(missionActive.missionId, pseudo);
       await retirerMissionActive(pseudo);
     } finally {
       setChargementAction(false);
@@ -172,6 +173,12 @@ export default function Missions() {
             {propositionCourante.preuveRequise && <span className="badge badge-preuve">📷 Preuve requise</span>}
           </div>
           <p className="mission-texte">{propositionCourante.texte}</p>
+          {propositionCourante.nombreAbandons > 0 && (
+            <p className="warning-text">
+              ⚠️ Cette mission a déjà été abandonnée {propositionCourante.nombreAbandons} fois par
+              d'autres joueurs — à vos risques et périls.
+            </p>
+          )}
           <div className="mission-actions">
             <button className="btn btn-primary" onClick={() => accepter(false)} disabled={chargementAction}>
               Accepter

@@ -17,6 +17,7 @@ export default function GodMode() {
   const [statsS2, setStatsS2] = useState(null);
   const [accusations, setAccusations] = useState([]);
   const [message, setMessage] = useState(null);
+  const [confirmationReinit, setConfirmationReinit] = useState(false);
 
   useEffect(() => {
     verifierBaseInitialisee().then(setBaseInitialisee);
@@ -35,6 +36,7 @@ export default function GodMode() {
     setProgression({ done: 0, total: 430 });
     await initialiserMissions((done, total) => setProgression({ done, total }));
     setBaseInitialisee(true);
+    setConfirmationReinit(false);
     afficherMessage('430 missions chargées dans la base.');
   }
 
@@ -83,6 +85,23 @@ export default function GodMode() {
           <div>
             <p>Saison 1 — Disponibles : {statsS1?.disponibles ?? '...'} / Actives : {statsS1?.actives ?? '...'} / Brûlées : {statsS1?.brulees ?? '...'} (total {statsS1?.total ?? '...'})</p>
             <p>Saison 2 — Disponibles : {statsS2?.disponibles ?? '...'} / Actives : {statsS2?.actives ?? '...'} / Brûlées : {statsS2?.brulees ?? '...'} (total {statsS2?.total ?? '...'})</p>
+
+            {!confirmationReinit ? (
+              <button className="btn btn-secondary" onClick={() => setConfirmationReinit(true)}>
+                Réinitialiser quand même les 430 missions
+              </button>
+            ) : (
+              <div className="confirmation-box">
+                <p className="warning-text">
+                  ⚠️ Ça va effacer tous les statuts actuels (disponible/active/brûlée) et remettre les 430
+                  missions à zéro. À utiliser seulement avant le début réel du jeu, ou si tu sais ce que tu fais.
+                </p>
+                <div className="mission-actions">
+                  <button className="btn btn-danger" onClick={lancerInitialisation}>Confirmer la réinitialisation</button>
+                  <button className="btn btn-secondary" onClick={() => setConfirmationReinit(false)}>Annuler</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {progression && (

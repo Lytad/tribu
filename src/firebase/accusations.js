@@ -32,8 +32,6 @@ export async function traiterAccusation(accusationId, resultat) {
 }
 
 export async function traiterAccusationRedondante(accusationId) {
-  // Une accusation identique (même cible, même jour) a déjà été jugée avant celle-ci.
-  // Aucun gain ni perte pour cet accusateur : seul le premier à avoir accusé compte.
   await updateDoc(doc(accusationsRef, accusationId), {
     statut: 'traitee',
     resultat: 'redondante',
@@ -42,7 +40,6 @@ export async function traiterAccusationRedondante(accusationId) {
 }
 
 export async function supprimerAccusationBug(accusationId) {
-  // Utilisé par le God Mode : suppression pure et simple, hors process Tribunal
   await updateDoc(doc(accusationsRef, accusationId), {
     statut: 'traitee',
     resultat: 'supprimee_bug',

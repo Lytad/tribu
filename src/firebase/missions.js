@@ -26,8 +26,9 @@ export async function initialiserMissions(onProgress) {
   }
 }
 
-// Tire une mission aléatoire disponible pour une saison donnée
-export async function piocherMission(saison) {
+// Tire une mission aléatoire disponible pour une saison donnée, en excluant les missions
+// que ce joueur a déjà abandonnées auparavant (il ne doit jamais la revoir).
+export async function piocherMission(saison, pseudo) {
   const q = query(
     missionsRef,
     where('saison', '==', saison),
@@ -35,8 +36,12 @@ export async function piocherMission(saison) {
   );
   const snap = await getDocs(q);
   if (snap.empty) return null;
-  const docs = snap.docs;
-  const choix = docs[Math.floor(Math.random() * docs.length)];
+  const docsEligibles = snap.docs.filter((d) => {
+    const exclus = d.data().joueursExclus || [];
+    return !pseudo || !exclus.includes(pseudo);
+  });
+  if (docsEligibles.length === 0) return null;
+  const choix = docsEligibles[Math.floor(Math.random() * docsEligibles.length)];
   return { id: choix.id, ...choix.data() };
 }
 
@@ -55,7 +60,25 @@ export async function bruleMission(missionId) {
   });
 }
 
-// Remet une mission disponible (ex: abandon → elle redevient piochable, ou correction admin)
+// Remet une mission disponible après un abandon : elle redevient piochable pour tout le
+// monde SAUF pour le joueur qui vient de l'abandonner (il ne doit plus jamais la revoir).
+// On incrémente aussi le compteur d'abandons, affiché aux futurs joueurs comme avertissement.
+export async function remettreDisponibleApresAbandon(missionId, pseudo) {
+  const snap = await getDocs(query(missionsRef, where('__name__', '==', missionId)));
+  const actuel = snap.empty ? {} : snap.docs[0].data();
+  const exclusActuels = actuel.joueursExclus || [];
+  const nombreAbandonsActuel = actuel.nombreAbandons || 0;
+
+  await updateDoc(doc(missionsRef, missionId), {
+    statut: 'disponible',
+    joueurActuel: null,
+    joueursExclus: pseudo && !exclusActuels.includes(pseudo) ? [...exclusActuels, pseudo] : exclusActuels,
+    nombreAbandons: nombreAbandonsActuel + 1,
+  });
+}
+
+// Remet une mission disponible sans exclusion (ex: correction admin, sabotage) — n'incrémente
+// pas le compteur d'abandons puisque ce n'est pas un abandon volontaire du joueur.
 export async function remettreDisponible(missionId) {
   await updateDoc(doc(missionsRef, missionId), {
     statut: 'disponible',
@@ -91,7 +114,7 @@ export async function sabrerMissionCible(pseudoCible, missionIdActuelle) {
 
   await updateDoc(doc(missionsRef, missionIdActuelle), { statut: 'disponible', joueurActuel: null });
 
-  const nouvelle = await piocherMission(saison);
+  const nouvelle = await piocherMission(saison, pseudoCible);
 
   if (nouvelle) {
     await marquerMissionActive(nouvelle.id, pseudoCible);
@@ -102,6 +125,7 @@ export async function sabrerMissionCible(pseudoCible, missionIdActuelle) {
         difficulte: nouvelle.difficulte,
         points: nouvelle.points,
         preuveRequise: nouvelle.preuveRequise,
+        nombreAbandons: nouvelle.nombreAbandons || 0,
         effetDeLevier: false,
         dateAcceptation: new Date().toISOString(),
       },

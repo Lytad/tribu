@@ -86,6 +86,16 @@ export default function Tribunal() {
     setAccusationOuverte(null);
   }
 
+  async function jugerAccusationValideeSurAbandon() {
+    if (!accusationOuverte) return;
+    // L'accusé avait vraiment cette mission mais l'a abandonnée avant le Tribunal — il a déjà
+    // payé le prix de l'abandon (-5 pts ou Amnésie), donc pas de malus supplémentaire ici.
+    // L'accusateur touche un bonus fixe, puisque la mission n'a rapporté aucun point à l'accusé.
+    await ajusterScore(accusationOuverte.accusateur, 10);
+    await traiterAccusation(accusationOuverte.id, 'validee_mission_abandonnee');
+    setAccusationOuverte(null);
+  }
+
   async function jugerDelitInitie() {
     if (!accusationOuverte) return;
     await ajusterScore(accusationOuverte.accusateur, POINTS.delitInitieMalus);
@@ -109,6 +119,15 @@ export default function Tribunal() {
       premiereParCible[acc.accuse] = acc.id;
     }
   });
+
+  // Pour l'accusation actuellement ouverte : est-ce que l'accusé n'a plus de mission active
+  // (donc soit réussie, soit abandonnée) ? Si oui, on retrouve la dernière entrée de journal
+  // le concernant pour afficher ce qu'il en est réellement.
+  function derniereEntreeJournalPour(pseudoAccuse) {
+    const entrees = journal.filter((e) => e.pseudo === pseudoAccuse);
+    if (entrees.length === 0) return null;
+    return entrees[entrees.length - 1];
+  }
 
   return (
     <div className="tribunal-screen">
@@ -171,44 +190,69 @@ export default function Tribunal() {
         })}
       </section>
 
-      {accusationOuverte && (
-        <div className="modal-overlay" onClick={() => setAccusationOuverte(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Jugement : {accusationOuverte.accusateur} vs {accusationOuverte.accuse}</h3>
-            <p className="dashboard-note">Accusation reçue à {formaterHeure(accusationOuverte.createdAt)}</p>
-            <p className="dashboard-note">« {accusationOuverte.description} »</p>
-            <p>Mission réelle de {accusationOuverte.accuse} : <strong>{tousJoueurs[accusationOuverte.accuse]?.missionActive?.texte || 'Aucune mission active'}</strong></p>
+      {accusationOuverte && (() => {
+        const missionActiveAccuse = tousJoueurs[accusationOuverte.accuse]?.missionActive;
+        const derniereEntree = derniereEntreeJournalPour(accusationOuverte.accuse);
+        const missionAbandonneeDetectee = !missionActiveAccuse && derniereEntree?.type === 'abandonnee';
 
-            {premiereParCible[accusationOuverte.accuse] !== accusationOuverte.id && (
-              <p className="warning-text">
-                ⚠️ {accusationOuverte.accuse} a déjà été accusé(e) plus tôt, à{' '}
-                {formaterHeure(accusations.find((a) => a.id === premiereParCible[accusationOuverte.accuse])?.createdAt)}
-                {' '}par {accusations.find((a) => a.id === premiereParCible[accusationOuverte.accuse])?.accusateur}.
-                Si c'est la même mission et qu'elle a déjà été validée, utilise "Accusation redondante"
-                ci-dessous plutôt que de revalider le pactole une deuxième fois.
-              </p>
-            )}
+        return (
+          <div className="modal-overlay" onClick={() => setAccusationOuverte(null)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h3>Jugement : {accusationOuverte.accusateur} vs {accusationOuverte.accuse}</h3>
+              <p className="dashboard-note">Accusation reçue à {formaterHeure(accusationOuverte.createdAt)}</p>
+              <p className="dashboard-note">« {accusationOuverte.description} »</p>
 
-            <div className="mission-actions" style={{ flexDirection: 'column' }}>
-              <button className="btn btn-secondary" onClick={jugerFausseAccusation}>
-                Fausse accusation (-10 pts accusateur)
-              </button>
-              <button className="btn btn-success" onClick={jugerAccusationValidee}>
-                Accusation validée (accusé perd mission + 10, accusateur vole le pactole)
-              </button>
-              <button className="btn btn-danger" onClick={jugerDelitInitie}>
-                Délit d'initié / triche avérée (-30 pts aux deux)
-              </button>
-              {premiereParCible[accusationOuverte.accuse] !== accusationOuverte.id && (
-                <button className="btn btn-secondary" onClick={jugerRedondante}>
-                  Accusation redondante (déjà traitée — aucun point pour cet accusateur)
-                </button>
+              {missionActiveAccuse ? (
+                <p>Mission réelle de {accusationOuverte.accuse} : <strong>{missionActiveAccuse.texte}</strong></p>
+              ) : missionAbandonneeDetectee ? (
+                <p className="warning-text">
+                  ⚠️ {accusationOuverte.accuse} n'a plus de mission active — sa dernière entrée du journal
+                  montre qu'il/elle a <strong>abandonné</strong> la mission : « {derniereEntree.texte} ».
+                  Si l'accusation portait bien sur cette mission, utilise le bouton dédié ci-dessous.
+                </p>
+              ) : (
+                <p className="dashboard-note">
+                  {accusationOuverte.accuse} n'a plus de mission active en ce moment (aucune entrée de
+                  journal correspondante trouvée — vérifie avec le groupe avant de trancher).
+                </p>
               )}
+
+              {premiereParCible[accusationOuverte.accuse] !== accusationOuverte.id && (
+                <p className="warning-text">
+                  ⚠️ {accusationOuverte.accuse} a déjà été accusé(e) plus tôt, à{' '}
+                  {formaterHeure(accusations.find((a) => a.id === premiereParCible[accusationOuverte.accuse])?.createdAt)}
+                  {' '}par {accusations.find((a) => a.id === premiereParCible[accusationOuverte.accuse])?.accusateur}.
+                  Si c'est la même mission et qu'elle a déjà été validée, utilise "Accusation redondante"
+                  ci-dessous plutôt que de revalider le pactole une deuxième fois.
+                </p>
+              )}
+
+              <div className="mission-actions" style={{ flexDirection: 'column' }}>
+                <button className="btn btn-secondary" onClick={jugerFausseAccusation}>
+                  Fausse accusation (-10 pts accusateur)
+                </button>
+                <button className="btn btn-success" onClick={jugerAccusationValidee}>
+                  Accusation validée (accusé perd mission + 10, accusateur vole le pactole)
+                </button>
+                {missionAbandonneeDetectee && (
+                  <button className="btn btn-success" onClick={jugerAccusationValideeSurAbandon}>
+                    Accusation validée — mission déjà abandonnée (+10 pts fixes accusateur, aucun malus accusé)
+                  </button>
+                )}
+                <button className="btn btn-danger" onClick={jugerDelitInitie}>
+                  Délit d'initié / triche avérée (-30 pts aux deux)
+                </button>
+                {premiereParCible[accusationOuverte.accuse] !== accusationOuverte.id && (
+                  <button className="btn btn-secondary" onClick={jugerRedondante}>
+                    Accusation redondante (déjà traitée — aucun point pour cet accusateur)
+                  </button>
+                )}
+              </div>
+              <button className="btn btn-secondary" onClick={() => setAccusationOuverte(null)}>Fermer</button>
             </div>
-            <button className="btn btn-secondary" onClick={() => setAccusationOuverte(null)}>Fermer</button>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

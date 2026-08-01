@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { ecouterJournalEnAttente, cloturerEntreeJournal } from '../../firebase/journal';
-import { ecouterAccusationsEnAttente, traiterAccusation } from '../../firebase/accusations';
+import { ecouterAccusationsEnAttente, traiterAccusation, traiterAccusationRedondante } from '../../firebase/accusations';
 import { ajusterScore, mettreAJourJoueur } from '../../firebase/joueurs';
 import { POINTS, heureDecimale, HEURE_DEBUT_TRIBUNAL, HEURE_FIN_TRIBUNAL } from '../../utils/constants';
 import { useEffect } from 'react';
@@ -15,6 +15,13 @@ export default function Tribunal() {
 
   const heureActuelle = heureDecimale();
   const dansLaFenetre = heureActuelle >= HEURE_DEBUT_TRIBUNAL || heureActuelle < HEURE_FIN_TRIBUNAL - 24 + 24; // toujours vrai la nuit ; on affiche juste un avertissement hors fenêtre
+
+  function formaterHeure(dateIso) {
+    if (!dateIso) return '';
+    return new Date(dateIso).toLocaleTimeString('fr-FR', {
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+  }
 
   useEffect(() => {
     const unsub1 = ecouterJournalEnAttente(setJournal);
@@ -87,6 +94,22 @@ export default function Tribunal() {
     setAccusationOuverte(null);
   }
 
+  async function jugerRedondante() {
+    if (!accusationOuverte) return;
+    await traiterAccusationRedondante(accusationOuverte.id);
+    setAccusationOuverte(null);
+  }
+
+  // Pour chaque accusation, on repère si elle est la première (par ordre chronologique,
+  // déjà garanti par le tri Firestore) à viser cette cible parmi les accusations en attente.
+  // Les suivantes sur la même cible sont signalées comme doublons potentiels.
+  const premiereParCible = {};
+  accusations.forEach((acc) => {
+    if (!(acc.accuse in premiereParCible)) {
+      premiereParCible[acc.accuse] = acc.id;
+    }
+  });
+
   return (
     <div className="tribunal-screen">
       <h2 className="dashboard-title">⚖️ Tribunal du Soir</h2>
@@ -124,21 +147,47 @@ export default function Tribunal() {
       <section className="tribunal-section">
         <h3>Accusations en attente</h3>
         {accusations.length === 0 && <p className="empty-state">Aucune accusation en attente.</p>}
-        {accusations.map((acc) => (
-          <div key={acc.id} className="tribunal-item">
-            <p><strong>{acc.accusateur}</strong> accuse <strong>{acc.accuse}</strong></p>
-            <p className="dashboard-note">« {acc.description} »</p>
-            <button className="btn btn-primary" onClick={() => ouvrirJugement(acc)}>Juger maintenant</button>
-          </div>
-        ))}
+        {accusations.map((acc) => {
+          const estDoublon = premiereParCible[acc.accuse] !== acc.id;
+          return (
+            <div key={acc.id} className="tribunal-item">
+              <div className="tribunal-item-header">
+                <strong>{acc.accusateur}</strong>
+                <span>accuse</span>
+                <strong>{acc.accuse}</strong>
+                {!estDoublon && <span className="badge badge-success">⏱ 1ère accusation — {formaterHeure(acc.createdAt)}</span>}
+                {estDoublon && <span className="badge badge-danger">⏱ Accusé à {formaterHeure(acc.createdAt)}</span>}
+              </div>
+              <p className="dashboard-note">« {acc.description} »</p>
+              {estDoublon && (
+                <p className="warning-text">
+                  ⚠️ {acc.accuse} a déjà été accusé(e) à {formaterHeure(accusations.find((a) => a.id === premiereParCible[acc.accuse])?.createdAt)}
+                  {' '}par {accusations.find((a) => a.id === premiereParCible[acc.accuse])?.accusateur} — probablement la même mission repérée par plusieurs joueurs.
+                </p>
+              )}
+              <button className="btn btn-primary" onClick={() => ouvrirJugement(acc)}>Juger maintenant</button>
+            </div>
+          );
+        })}
       </section>
 
       {accusationOuverte && (
         <div className="modal-overlay" onClick={() => setAccusationOuverte(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h3>Jugement : {accusationOuverte.accusateur} vs {accusationOuverte.accuse}</h3>
+            <p className="dashboard-note">Accusation reçue à {formaterHeure(accusationOuverte.createdAt)}</p>
             <p className="dashboard-note">« {accusationOuverte.description} »</p>
             <p>Mission réelle de {accusationOuverte.accuse} : <strong>{tousJoueurs[accusationOuverte.accuse]?.missionActive?.texte || 'Aucune mission active'}</strong></p>
+
+            {premiereParCible[accusationOuverte.accuse] !== accusationOuverte.id && (
+              <p className="warning-text">
+                ⚠️ {accusationOuverte.accuse} a déjà été accusé(e) plus tôt, à{' '}
+                {formaterHeure(accusations.find((a) => a.id === premiereParCible[accusationOuverte.accuse])?.createdAt)}
+                {' '}par {accusations.find((a) => a.id === premiereParCible[accusationOuverte.accuse])?.accusateur}.
+                Si c'est la même mission et qu'elle a déjà été validée, utilise "Accusation redondante"
+                ci-dessous plutôt que de revalider le pactole une deuxième fois.
+              </p>
+            )}
 
             <div className="mission-actions" style={{ flexDirection: 'column' }}>
               <button className="btn btn-secondary" onClick={jugerFausseAccusation}>
@@ -150,6 +199,11 @@ export default function Tribunal() {
               <button className="btn btn-danger" onClick={jugerDelitInitie}>
                 Délit d'initié / triche avérée (-30 pts aux deux)
               </button>
+              {premiereParCible[accusationOuverte.accuse] !== accusationOuverte.id && (
+                <button className="btn btn-secondary" onClick={jugerRedondante}>
+                  Accusation redondante (déjà traitée — aucun point pour cet accusateur)
+                </button>
+              )}
             </div>
             <button className="btn btn-secondary" onClick={() => setAccusationOuverte(null)}>Fermer</button>
           </div>

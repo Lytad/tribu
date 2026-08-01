@@ -358,6 +358,7 @@
 .tribunal-item-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 8px;
 }

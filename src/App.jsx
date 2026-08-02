@@ -6,6 +6,7 @@ import Missions from './screens/Missions';
 import Accusation from './screens/Accusation';
 import Boutique from './screens/Boutique';
 import Casino from './screens/Casino';
+import Journal from './screens/Journal';
 import AdminPin from './screens/admin/AdminPin';
 import Tribunal from './screens/admin/Tribunal';
 import GodMode from './screens/admin/GodMode';
@@ -18,6 +19,7 @@ const ONGLETS = [
   { id: 'accusation', label: 'Accuser', icon: '🕵️' },
   { id: 'boutique', label: 'Boutique', icon: '🛒' },
   { id: 'casino', label: 'Casino', icon: '🎰' },
+  { id: 'journal', label: 'Journal', icon: '📰' },
 ];
 
 function AppContent() {
@@ -65,6 +67,7 @@ function AppContent() {
         {onglet === 'accusation' && <Accusation />}
         {onglet === 'boutique' && <Boutique />}
         {onglet === 'casino' && <Casino />}
+        {onglet === 'journal' && <Journal />}
       </main>
 
       <nav className="app-nav">

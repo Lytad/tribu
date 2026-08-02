@@ -3,6 +3,9 @@ import { useGame } from '../context/GameContext';
 import { ajusterScore, mettreAJourJoueur } from '../firebase/joueurs';
 import { sabrerMissionCible } from '../firebase/missions';
 import { ajouterEvenement } from '../firebase/evenements';
+import {
+  ajusterScoreTest, mettreAJourJoueurTest, sabrerMissionCibleTest, ajouterEvenementTest, TEST_JOUEURS,
+} from '../firebase/sandbox';
 import { POINTS, TOUS_JOUEURS } from '../utils/constants';
 
 function finDeJournee() {
@@ -12,7 +15,7 @@ function finDeJournee() {
 }
 
 export default function Boutique() {
-  const { pseudo, joueur, tousJoueurs } = useGame();
+  const { pseudo, joueur, tousJoueurs, modeTest } = useGame();
   const [cibleGel, setCibleGel] = useState('');
   const [cibleSabotage, setCibleSabotage] = useState('');
   const [cibleIndice, setCibleIndice] = useState('');
@@ -22,8 +25,18 @@ export default function Boutique() {
   const [message, setMessage] = useState(null);
   const [chargement, setChargement] = useState(false);
 
+  const fn = modeTest ? {
+    ajusterScore: ajusterScoreTest,
+    mettreAJourJoueur: mettreAJourJoueurTest,
+    sabrerMissionCible: sabrerMissionCibleTest,
+    ajouterEvenement: ajouterEvenementTest,
+  } : {
+    ajusterScore, mettreAJourJoueur, sabrerMissionCible, ajouterEvenement,
+  };
+
   const solde = joueur?.score || 0;
-  const autresJoueurs = Object.keys(tousJoueurs).filter((p) => p !== pseudo && TOUS_JOUEURS.includes(p));
+  const listeJoueursValides = modeTest ? TEST_JOUEURS : TOUS_JOUEURS;
+  const autresJoueurs = Object.keys(tousJoueurs).filter((p) => p !== pseudo && listeJoueursValides.includes(p));
 
   const amnesieActive = joueur?.amnesieActiveJusqua && new Date(joueur.amnesieActiveJusqua) > new Date();
 
@@ -37,9 +50,9 @@ export default function Boutique() {
     if (solde < POINTS.amnesieCout) return afficherMessage('Solde insuffisant.');
     setChargement(true);
     try {
-      await ajusterScore(pseudo, -POINTS.amnesieCout);
-      await mettreAJourJoueur(pseudo, { amnesieActiveJusqua: finDeJournee() });
-      await ajouterEvenement('Quelqu\'un s\'est protégé pour la journée.');
+      await fn.ajusterScore(pseudo, -POINTS.amnesieCout);
+      await fn.mettreAJourJoueur(pseudo, { amnesieActiveJusqua: finDeJournee() });
+      await fn.ajouterEvenement('Quelqu\'un s\'est protégé pour la journée.');
       afficherMessage('Amnésie activée pour la journée. Si une accusation contre toi est validée ce soir, tu pourras choisir de l\'annuler au Tribunal.');
     } finally {
       setChargement(false);
@@ -55,7 +68,7 @@ export default function Boutique() {
     }
     setChargement(true);
     try {
-      await ajusterScore(pseudo, -POINTS.indiceCout);
+      await fn.ajusterScore(pseudo, -POINTS.indiceCout);
       setIndiceResultat({ cible: cibleIndice, difficulte: cibleData.missionActive.difficulte });
       setCibleIndice('');
     } finally {
@@ -68,10 +81,10 @@ export default function Boutique() {
     if (solde < POINTS.gelCout) return afficherMessage('Solde insuffisant.');
     setChargement(true);
     try {
-      await ajusterScore(pseudo, -POINTS.gelCout);
+      await fn.ajusterScore(pseudo, -POINTS.gelCout);
       const dans24h = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      await mettreAJourJoueur(cibleGel, { geleJusqua: dans24h });
-      await ajouterEvenement(`${cibleGel} a été gelé(e) au Casino pendant 24h.`);
+      await fn.mettreAJourJoueur(cibleGel, { geleJusqua: dans24h });
+      await fn.ajouterEvenement(`${cibleGel} a été gelé(e) au Casino pendant 24h.`);
       afficherMessage(`Gel des Avoirs appliqué à ${cibleGel} pour 24h.`);
       setCibleGel('');
     } finally {
@@ -86,9 +99,9 @@ export default function Boutique() {
     if (!cibleData?.missionActive) return afficherMessage(`${cibleSabotage} n'a pas de mission active à saboter.`);
     setChargement(true);
     try {
-      await ajusterScore(pseudo, -POINTS.sabotageCout);
-      await sabrerMissionCible(cibleSabotage, cibleData.missionActive.missionId);
-      await ajouterEvenement(`${cibleSabotage} a été saboté(e) — nouvelle mission forcée.`);
+      await fn.ajusterScore(pseudo, -POINTS.sabotageCout);
+      await fn.sabrerMissionCible(cibleSabotage, cibleData.missionActive.missionId);
+      await fn.ajouterEvenement(`${cibleSabotage} a été saboté(e) — nouvelle mission forcée.`);
       afficherMessage(`Sabotage appliqué : ${cibleSabotage} va recevoir une nouvelle mission aléatoire.`);
       setCibleSabotage('');
     } finally {
@@ -103,8 +116,8 @@ export default function Boutique() {
     if (!cibleData?.missionActive) return afficherMessage(`${cibleUsurpation} n'a pas de mission active en ce moment.`);
     setChargement(true);
     try {
-      await ajusterScore(pseudo, -POINTS.usurpationCout);
-      await ajouterEvenement(`La difficulté de la mission de ${cibleUsurpation} a été dévoilée : ${cibleData.missionActive.difficulte.toUpperCase()}.`);
+      await fn.ajusterScore(pseudo, -POINTS.usurpationCout);
+      await fn.ajouterEvenement(`La difficulté de la mission de ${cibleUsurpation} a été dévoilée : ${cibleData.missionActive.difficulte.toUpperCase()}.`);
       afficherMessage(`Usurpation appliquée : la difficulté de la mission de ${cibleUsurpation} est maintenant publique dans le Journal.`);
       setCibleUsurpation('');
     } finally {
@@ -117,9 +130,9 @@ export default function Boutique() {
     if (solde < POINTS.ralentissementCout) return afficherMessage('Solde insuffisant.');
     setChargement(true);
     try {
-      await ajusterScore(pseudo, -POINTS.ralentissementCout);
-      await mettreAJourJoueur(cibleRalentissement, { prochaineMissionForceeDifficile: 'difficile' });
-      await ajouterEvenement(`${cibleRalentissement} doit maintenant affronter une mission DIFFICILE forcée.`);
+      await fn.ajusterScore(pseudo, -POINTS.ralentissementCout);
+      await fn.mettreAJourJoueur(cibleRalentissement, { prochaineMissionForceeDifficile: 'difficile' });
+      await fn.ajouterEvenement(`${cibleRalentissement} doit maintenant affronter une mission DIFFICILE forcée.`);
       afficherMessage(`Ralentissement appliqué : la prochaine mission de ${cibleRalentissement} sera difficile.`);
       setCibleRalentissement('');
     } finally {

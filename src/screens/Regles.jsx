@@ -138,6 +138,7 @@ const SECTIONS = [
       <>
         <p>Chaque soir entre 21h00 et minuit, tout le monde se réunit pour le moment clé du jeu.</p>
         <p><strong>Le débrief :</strong> les missions réussies ou abandonnées de la journée sont révélées publiquement — on découvre qui faisait quoi. Les missions en cours ou futures restent strictement secrètes.</p>
+        <p><strong>La validation collective :</strong> pour toute mission déclarée réussie, le groupe peut la contester même si aucune preuve n'était formellement requise. Si personne ne confirme l'avoir vue ou n'y croit, l'admin peut l'invalider : les points gagnés sont retirés, sans pénalité supplémentaire — mais la mission reste définitivement perdue pour tout le monde.</p>
         <p><strong>Le jugement des accusations :</strong> pour chaque accusation en attente, l'admin la lit à voix haute. L'accusé doit révéler sa véritable mission en cours. Plusieurs issues sont possibles :</p>
         <ul>
           <li><strong>Fausse accusation</strong> — l'accusateur s'est trompé : il perd 10 points. L'accusé garde sa mission secrète active, rien ne change pour lui.</li>

@@ -3,9 +3,11 @@ import { useGame } from '../context/GameContext';
 import { piocherMission, marquerMissionActive, bruleMission, remettreDisponibleApresAbandon } from '../firebase/missions';
 import { ajusterScore, definirMissionActive, retirerMissionActive, mettreAJourJoueur } from '../firebase/joueurs';
 import { ajouterEntreeJournal } from '../firebase/journal';
+import { ajouterEvenement } from '../firebase/evenements';
 import { POINTS } from '../utils/constants';
 
 const LABELS_DIFFICULTE = { facile: 'Facile', moyenne: 'Moyenne', difficile: 'Difficile' };
+const LABELS_DIFFICULTE_MAJ = { facile: 'FACILE', moyenne: 'MOYENNE', difficile: 'DIFFICILE' };
 
 export default function Missions() {
   const { pseudo, joueur, saison } = useGame();
@@ -28,7 +30,13 @@ export default function Missions() {
     setErreur(null);
     setChargementAction(true);
     try {
-      const mission = await piocherMission(saison, pseudo);
+      const difficulteForcee = joueur?.prochaineMissionForceeDifficile || null;
+      const mission = await piocherMission(saison, pseudo, difficulteForcee);
+      if (difficulteForcee) {
+        // Le Ralentissement ne s'applique qu'une seule fois : on le consomme dès qu'on
+        // a tenté de piocher avec, qu'une mission ait été trouvée ou non.
+        await mettreAJourJoueur(pseudo, { prochaineMissionForceeDifficile: null });
+      }
       if (!mission) {
         setErreur("Plus aucune mission disponible pour l'instant dans cette saison.");
         setPropositionCourante(null);
@@ -107,6 +115,7 @@ export default function Missions() {
       });
       await bruleMission(missionActive.missionId);
       await retirerMissionActive(pseudo);
+      await ajouterEvenement(`Une mission ${LABELS_DIFFICULTE_MAJ[missionActive.difficulte]} vient d'être réussie.`);
       setConfirmationReussite(false);
     } finally {
       setChargementAction(false);
@@ -117,12 +126,7 @@ export default function Missions() {
     if (!missionActive) return;
     setChargementAction(true);
     try {
-      const aAmnesie = (joueur.inventaire?.amnesieDisponible || 0) > 0;
-      if (aAmnesie) {
-        await mettreAJourJoueur(pseudo, { 'inventaire.amnesieDisponible': (joueur.inventaire.amnesieDisponible - 1) });
-      } else {
-        await ajusterScore(pseudo, POINTS.abandonner);
-      }
+      await ajusterScore(pseudo, POINTS.abandonner);
       await ajouterEntreeJournal({
         pseudo,
         missionId: missionActive.missionId,
@@ -135,6 +139,7 @@ export default function Missions() {
       });
       await remettreDisponibleApresAbandon(missionActive.missionId, pseudo);
       await retirerMissionActive(pseudo);
+      await ajouterEvenement(`Quelqu'un a abandonné une mission ${LABELS_DIFFICULTE_MAJ[missionActive.difficulte]}.`);
     } finally {
       setChargementAction(false);
     }
@@ -163,7 +168,7 @@ export default function Missions() {
                 ✅ Mission accomplie
               </button>
               <button className="btn btn-danger" onClick={abandonner} disabled={chargementAction}>
-                ❌ Abandonner (-5 pts{(joueur.inventaire?.amnesieDisponible || 0) > 0 ? ' — Amnésie dispo' : ''})
+                ❌ Abandonner (-5 pts)
               </button>
             </div>
           ) : (

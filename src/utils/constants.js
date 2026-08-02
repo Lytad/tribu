@@ -19,10 +19,12 @@ export const POINTS = {
   effetDeLevierCout: -15,
   fausseAccusation: -10,
   accuseMalus: -10,
-  amnesieCout: 10,
-  capeCout: 25,
+  amnesieCout: 25,
+  indiceCout: 15,
   gelCout: 30,
+  ralentissementCout: 30,
   sabotageCout: 40,
+  usurpationCout: 35,
   delitInitieMalus: -30,
 };
 
@@ -38,8 +40,6 @@ export const CASINO = {
 export const HEURE_FIN_ACCUSATIONS = 20.5; // 20h30
 export const HEURE_DEBUT_TRIBUNAL = 21;
 export const HEURE_FIN_TRIBUNAL = 24;
-export const HEURE_DEBUT_ACHAT_CAPE = 0.0167; // 00h01
-export const HEURE_FIN_ACHAT_CAPE = 20.983; // 20h59
 
 export function saisonActuelle(date = new Date()) {
   if (date >= SAISON_2_DEBUT) return 2;

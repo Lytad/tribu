@@ -1,9 +1,10 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { assurerJoueur, ecouterJoueur, ecouterTousJoueurs } from '../firebase/joueurs';
-import { ecouterForceRefresh } from '../firebase/godmode';
+import { assurerJoueur, ecouterJoueur, ecouterTousJoueurs, mettreAJourJoueur } from '../firebase/joueurs';
+import { remettreDisponible } from '../firebase/missions';
+import { ecouterForceRefresh, tenterVerrouResetSaison2 } from '../firebase/godmode';
 import { ajouterEvenement } from '../firebase/evenements';
 import { ecouterJoueurTest, ecouterTousJoueursTest } from '../firebase/sandbox';
-import { saisonActuelle, ADMIN_PSEUDO } from '../utils/constants';
+import { saisonActuelle, ADMIN_PSEUDO, JOUEURS_SAISON_1 } from '../utils/constants';
 
 const GameContext = createContext(null);
 
@@ -95,6 +96,25 @@ export function GameProvider({ children }) {
       ajouterEvenement(`${leaderActuel} est passé(e) en tête du classement !`);
     }
   }, [tousJoueurs, pseudo, modeTest]);
+
+  // Remise à zéro automatique des scores de Mattia/Hilaire/AD au passage en Saison 2.
+  // Le verrou transactionnel garantit que même si plusieurs appareils AD sont ouverts au
+  // même moment, un seul déclenche réellement la remise à zéro (une fois pour toutes).
+  useEffect(() => {
+    if (pseudo !== ADMIN_PSEUDO || modeTest || saison !== 2) return;
+    tenterVerrouResetSaison2().then(async (verrouObtenu) => {
+      if (!verrouObtenu) return;
+      for (const p of JOUEURS_SAISON_1) {
+        const missionEnCours = tousJoueurs[p]?.missionActive;
+        if (missionEnCours?.missionId) {
+          await remettreDisponible(missionEnCours.missionId);
+        }
+        await mettreAJourJoueur(p, { score: 40, scoreValide: 40, missionActive: null });
+      }
+      await ajouterEvenement('La Saison 2 commence — tous les scores repartent à 40 points !');
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saison, pseudo, modeTest]);
 
   function connecter(nouveauPseudo) {
     localStorage.setItem(STORAGE_KEY, nouveauPseudo);

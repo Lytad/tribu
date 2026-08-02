@@ -4,10 +4,13 @@ import { ajusterScore, retirerMissionActive } from '../../firebase/joueurs';
 import { initialiserMissions, verifierBaseInitialisee, ecouterStatsMissions, remettreDisponible } from '../../firebase/missions';
 import { declencherForceRefresh } from '../../firebase/godmode';
 import { ecouterAccusationsEnAttente, supprimerAccusationBug } from '../../firebase/accusations';
+import {
+  reinitialiserBacASable, verifierBacASableInitialise, ecouterStatsMissionsTest,
+} from '../../firebase/sandbox';
 import { TOUS_JOUEURS } from '../../utils/constants';
 
 export default function GodMode() {
-  const { tousJoueurs } = useGame();
+  const { tousJoueurs, entrerModeTest } = useGame();
   const [cibleScore, setCibleScore] = useState('');
   const [montantScore, setMontantScore] = useState('');
   const [cibleKill, setCibleKill] = useState('');
@@ -18,14 +21,44 @@ export default function GodMode() {
   const [accusations, setAccusations] = useState([]);
   const [message, setMessage] = useState(null);
   const [confirmationReinit, setConfirmationReinit] = useState(false);
+  const [bacASableInitialise, setBacASableInitialise] = useState(null);
+  const [statsBacASable, setStatsBacASable] = useState(null);
+  const [chargementBacASable, setChargementBacASable] = useState(false);
 
   useEffect(() => {
     verifierBaseInitialisee().then(setBaseInitialisee);
+    verifierBacASableInitialise().then(setBacASableInitialise);
     const unsub1 = ecouterStatsMissions(1, setStatsS1);
     const unsub2 = ecouterStatsMissions(2, setStatsS2);
     const unsub3 = ecouterAccusationsEnAttente(setAccusations);
-    return () => { unsub1(); unsub2(); unsub3(); };
+    const unsub4 = ecouterStatsMissionsTest(setStatsBacASable);
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
   }, []);
+
+  async function reinitialiserEtEntrerTest() {
+    setChargementBacASable(true);
+    try {
+      await reinitialiserBacASable();
+      setBacASableInitialise(true);
+      entrerModeTest();
+    } finally {
+      setChargementBacASable(false);
+    }
+  }
+
+  function entrerSansReinitialiser() {
+    entrerModeTest();
+  }
+
+  async function reinitialiserSeulement() {
+    setChargementBacASable(true);
+    try {
+      await reinitialiserBacASable();
+      afficherMessage('Bac à sable réinitialisé : TEST1 et TEST2 à 40 pts, 10 missions disponibles.');
+    } finally {
+      setChargementBacASable(false);
+    }
+  }
 
   function afficherMessage(txt) {
     setMessage(txt);
@@ -73,6 +106,34 @@ export default function GodMode() {
     <div className="godmode-screen">
       <h2 className="dashboard-title">🛠️ God Mode</h2>
       {message && <div className="toast-message">{message}</div>}
+
+      <section className="tribunal-section bac-a-sable-section">
+        <h3>🧪 Bac à Sable — tester sans impact sur la vraie partie</h3>
+        <p className="dashboard-note">
+          Un environnement complètement séparé avec deux joueurs fictifs (TEST1, TEST2) et
+          10 missions dédiées. Rien ici ne touche aux vraies données du jeu — utilisable à
+          n'importe quelle date, même avant le 6 août.
+        </p>
+        {bacASableInitialise && statsBacASable && (
+          <p className="dashboard-note">
+            Missions test — Disponibles : {statsBacASable.disponibles} / Actives : {statsBacASable.actives} / Brûlées : {statsBacASable.brulees}
+          </p>
+        )}
+        <div className="mission-actions">
+          {bacASableInitialise ? (
+            <button className="btn btn-primary" onClick={entrerSansReinitialiser} disabled={chargementBacASable}>
+              🧪 Entrer en Mode Test (reprendre où c'était)
+            </button>
+          ) : (
+            <button className="btn btn-primary" onClick={reinitialiserEtEntrerTest} disabled={chargementBacASable}>
+              🧪 Initialiser et Entrer en Mode Test
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={reinitialiserSeulement} disabled={chargementBacASable}>
+            Réinitialiser (repartir à zéro)
+          </button>
+        </div>
+      </section>
 
       <section className="tribunal-section">
         <h3>Base de missions</h3>

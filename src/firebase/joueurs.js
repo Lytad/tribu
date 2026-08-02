@@ -1,5 +1,5 @@
 import {
-  doc, getDoc, setDoc, updateDoc, onSnapshot, collection, increment,
+  doc, getDoc, setDoc, updateDoc, onSnapshot, collection,
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -12,10 +12,10 @@ export async function assurerJoueur(pseudo) {
   if (!snap.exists()) {
     await setDoc(ref, {
       pseudo,
-      score: 0,
-      scoreValide: 0, // score officiel après passage au Tribunal
+      score: 40, // solde de départ offert à chaque nouveau joueur
+      scoreValide: 40,
       missionActive: null, // { missionId, texte, difficulte, points, effetDeLevier, dateAcceptation }
-      inventaire: { capeInvisibilite: 0 }, // objets achetés en attente d'usage
+      inventaire: { capeInvisibilite: 0, amnesieDisponible: 0 }, // objets achetés en attente d'usage
       geleJusqua: null, // timestamp ISO si Gel des Avoirs actif
       casinoBeneficeJour: 0,
       casinoDateJour: null, // pour reset quotidien
@@ -40,9 +40,14 @@ export function ecouterTousJoueurs(callback) {
   });
 }
 
+// Ajuste le score d'un joueur, sans jamais descendre sous 0 : si un malus dépasserait ce
+// plancher, seule la portion nécessaire pour atteindre 0 est réellement appliquée.
 export async function ajusterScore(pseudo, delta) {
   const ref = doc(joueursRef, pseudo);
-  await updateDoc(ref, { score: increment(delta) });
+  const snap = await getDoc(ref);
+  const scoreActuel = snap.exists() ? (snap.data().score || 0) : 0;
+  const nouveauScore = Math.max(0, scoreActuel + delta);
+  await updateDoc(ref, { score: nouveauScore });
 }
 
 export async function definirMissionActive(pseudo, mission) {

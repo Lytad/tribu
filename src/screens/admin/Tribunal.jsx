@@ -90,7 +90,8 @@ export default function Tribunal() {
     if (!entreeEncoreEnAttente(entree.id) || idsEnTraitement.has(entree.id)) return;
     marquerEnTraitement(entree.id);
     try {
-      await fn.cloturerEntreeJournal(entree.id, 'invalidee_preuve');
+      const decision = entree.preuveRequise ? 'invalidee_preuve' : 'invalidee_non_validee_groupe';
+      await fn.cloturerEntreeJournal(entree.id, decision);
       if (entree.type === 'reussie') {
         await fn.ajusterScore(entree.pseudo, -entree.points);
       }
@@ -213,13 +214,17 @@ export default function Tribunal() {
               </div>
               <p>{entree.texte}</p>
               <p className="dashboard-note">{entree.points} pts {entree.effetDeLevier && '(effet de levier)'}</p>
-              {entree.type === 'reussie' && entree.preuveRequise && (
+              {entree.type === 'reussie' && (
                 <div className="mission-actions">
-                  <button className="btn btn-success" onClick={() => validerMissionEntree(entree)} disabled={enTraitement}>Preuve OK — Valider</button>
-                  <button className="btn btn-danger" onClick={() => invaliderMissionEntree(entree)} disabled={enTraitement}>Pas de preuve — Invalider</button>
+                  <button className="btn btn-success" onClick={() => validerMissionEntree(entree)} disabled={enTraitement}>
+                    {entree.preuveRequise ? 'Preuve OK — Valider' : 'Valider'}
+                  </button>
+                  <button className="btn btn-danger" onClick={() => invaliderMissionEntree(entree)} disabled={enTraitement}>
+                    {entree.preuveRequise ? 'Pas de preuve — Invalider' : "Personne ne valide — Invalider"}
+                  </button>
                 </div>
               )}
-              {(entree.type === 'abandonnee' || !entree.preuveRequise) && (
+              {entree.type === 'abandonnee' && (
                 <button className="btn btn-secondary" onClick={() => validerMissionEntree(entree)} disabled={enTraitement}>Acter (clore)</button>
               )}
             </div>

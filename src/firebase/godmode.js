@@ -1,4 +1,4 @@
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, runTransaction } from 'firebase/firestore';
 import { db } from './config';
 
 const systemRef = doc(db, 'systeme', 'etat');
@@ -23,5 +23,18 @@ export async function forcerSaison(saison) {
 export function ecouterEtatSysteme(callback) {
   return onSnapshot(systemRef, (snap) => {
     callback(snap.exists() ? snap.data() : {});
+  });
+}
+
+// Verrou anti-doublon pour la remise à zéro des scores au passage en Saison 2 : la
+// transaction garantit qu'une seule exécution (parmi plusieurs appels simultanés depuis
+// différents appareils/onglets AD) pose réellement le verrou et obtient le feu vert pour agir.
+export async function tenterVerrouResetSaison2() {
+  return runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(systemRef);
+    const dejaFait = snap.exists() && snap.data().resetSaison2Fait;
+    if (dejaFait) return false;
+    transaction.set(systemRef, { resetSaison2Fait: true }, { merge: true });
+    return true;
   });
 }

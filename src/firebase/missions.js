@@ -27,13 +27,18 @@ export async function initialiserMissions(onProgress) {
 }
 
 // Tire une mission aléatoire disponible pour une saison donnée, en excluant les missions
-// que ce joueur a déjà abandonnées auparavant (il ne doit jamais la revoir).
-export async function piocherMission(saison, pseudo) {
-  const q = query(
-    missionsRef,
+// que ce joueur a déjà abandonnées auparavant (il ne doit jamais la revoir). Si
+// difficulteForcee est fourni (ex: suite à un Ralentissement), seules les missions de cette
+// difficulté sont proposées.
+export async function piocherMission(saison, pseudo, difficulteForcee) {
+  const contraintes = [
     where('saison', '==', saison),
     where('statut', '==', 'disponible'),
-  );
+  ];
+  if (difficulteForcee) {
+    contraintes.push(where('difficulte', '==', difficulteForcee));
+  }
+  const q = query(missionsRef, ...contraintes);
   const snap = await getDocs(q);
   if (snap.empty) return null;
   const docsEligibles = snap.docs.filter((d) => {

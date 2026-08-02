@@ -2,6 +2,7 @@ import {
   doc, getDoc, setDoc, updateDoc, onSnapshot, collection,
 } from 'firebase/firestore';
 import { db } from './config';
+import { ajouterEvenement } from './evenements';
 
 const joueursRef = collection(db, 'joueurs');
 
@@ -15,12 +16,14 @@ export async function assurerJoueur(pseudo) {
       score: 40, // solde de départ offert à chaque nouveau joueur
       scoreValide: 40,
       missionActive: null, // { missionId, texte, difficulte, points, effetDeLevier, dateAcceptation }
-      inventaire: { capeInvisibilite: 0, amnesieDisponible: 0 }, // objets achetés en attente d'usage
+      amnesieActiveJusqua: null, // timestamp ISO si Amnésie active pour la journée
+      prochaineMissionForceeDifficile: null, // 'difficile' si Ralentissement subi
       geleJusqua: null, // timestamp ISO si Gel des Avoirs actif
       casinoBeneficeJour: 0,
       casinoDateJour: null, // pour reset quotidien
       createdAt: new Date().toISOString(),
     });
+    await ajouterEvenement(`${pseudo} a rejoint la partie.`);
   }
   return ref;
 }

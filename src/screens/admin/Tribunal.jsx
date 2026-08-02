@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { ecouterJournalEnAttente, cloturerEntreeJournal } from '../../firebase/journal';
 import { ecouterAccusationsEnAttente, traiterAccusation, traiterAccusationRedondante } from '../../firebase/accusations';
-import { ajusterScore, mettreAJourJoueur } from '../../firebase/joueurs';
+import { ajusterScore, mettreAJourJoueur, retirerMissionActive } from '../../firebase/joueurs';
+import { bruleMission } from '../../firebase/missions';
 import { POINTS, heureDecimale, HEURE_DEBUT_TRIBUNAL, HEURE_FIN_TRIBUNAL } from '../../utils/constants';
 import { useEffect } from 'react';
 
@@ -82,6 +83,13 @@ export default function Tribunal() {
     // L'accusateur vole le pactole complet (points de la mission + 10)
     await ajusterScore(accusationOuverte.accusateur, pointsMission + 10);
 
+    // La mission démasquée est consommée : brûlée définitivement (comme une mission réussie),
+    // et retirée de l'écran de l'accusé pour qu'il ne puisse plus la valider a posteriori.
+    if (missionActiveAccuse?.missionId) {
+      await bruleMission(missionActiveAccuse.missionId);
+    }
+    await retirerMissionActive(accusationOuverte.accuse);
+
     await traiterAccusation(accusationOuverte.id, 'validee');
     setAccusationOuverte(null);
   }
@@ -127,6 +135,13 @@ export default function Tribunal() {
     const entrees = journal.filter((e) => e.pseudo === pseudoAccuse);
     if (entrees.length === 0) return null;
     return entrees[entrees.length - 1];
+  }
+
+  // Tout l'historique du jour pour un joueur (missions terminées/abandonnées), trié
+  // chronologiquement — permet de retrouver quelle mission correspond à quelle accusation
+  // quand plusieurs missions se sont enchaînées dans la même journée.
+  function historiqueJournalPour(pseudoAccuse) {
+    return journal.filter((e) => e.pseudo === pseudoAccuse);
   }
 
   return (
@@ -203,7 +218,7 @@ export default function Tribunal() {
               <p className="dashboard-note">« {accusationOuverte.description} »</p>
 
               {missionActiveAccuse ? (
-                <p>Mission réelle de {accusationOuverte.accuse} : <strong>{missionActiveAccuse.texte}</strong></p>
+                <p>Mission active actuelle de {accusationOuverte.accuse} : <strong>{missionActiveAccuse.texte}</strong></p>
               ) : missionAbandonneeDetectee ? (
                 <p className="warning-text">
                   ⚠️ {accusationOuverte.accuse} n'a plus de mission active — sa dernière entrée du journal
@@ -215,6 +230,20 @@ export default function Tribunal() {
                   {accusationOuverte.accuse} n'a plus de mission active en ce moment (aucune entrée de
                   journal correspondante trouvée — vérifie avec le groupe avant de trancher).
                 </p>
+              )}
+
+              {historiqueJournalPour(accusationOuverte.accuse).length > 0 && (
+                <div className="confirmation-box">
+                  <p className="dashboard-note">
+                    Historique du jour pour {accusationOuverte.accuse} (compare avec l'heure de
+                    l'accusation ci-dessus pour identifier la bonne mission) :
+                  </p>
+                  {historiqueJournalPour(accusationOuverte.accuse).map((entree) => (
+                    <p key={entree.id} className="dashboard-note">
+                      {formaterHeure(entree.createdAt)} — {entree.type === 'reussie' ? '✅ Réussie' : '❌ Abandonnée'} : « {entree.texte} »
+                    </p>
+                  ))}
+                </div>
               )}
 
               {premiereParCible[accusationOuverte.accuse] !== accusationOuverte.id && (

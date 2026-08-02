@@ -1,25 +1,29 @@
 import { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { creerAccusation } from '../firebase/accusations';
+import { creerAccusationTest, TEST_JOUEURS } from '../firebase/sandbox';
 import { TOUS_JOUEURS, heureDecimale, HEURE_FIN_ACCUSATIONS } from '../utils/constants';
 
 export default function Accusation() {
-  const { pseudo, tousJoueurs } = useGame();
+  const { pseudo, tousJoueurs, modeTest } = useGame();
   const [cible, setCible] = useState('');
   const [description, setDescription] = useState('');
   const [envoyee, setEnvoyee] = useState(false);
   const [envoi, setEnvoi] = useState(false);
 
   const heureActuelle = heureDecimale();
-  const fenetreOuverte = heureActuelle < HEURE_FIN_ACCUSATIONS;
+  // En mode test, la fenêtre horaire de 20h30 est ignorée pour pouvoir tester à toute heure.
+  const fenetreOuverte = modeTest || heureActuelle < HEURE_FIN_ACCUSATIONS;
 
-  const autresJoueurs = Object.keys(tousJoueurs).filter((p) => p !== pseudo && TOUS_JOUEURS.includes(p));
+  const listeJoueursValides = modeTest ? TEST_JOUEURS : TOUS_JOUEURS;
+  const autresJoueurs = Object.keys(tousJoueurs).filter((p) => p !== pseudo && listeJoueursValides.includes(p));
 
   async function envoyer() {
     if (!cible || !description.trim()) return;
     setEnvoi(true);
     try {
-      await creerAccusation({ accusateur: pseudo, accuse: cible, description: description.trim() });
+      const creer = modeTest ? creerAccusationTest : creerAccusation;
+      await creer({ accusateur: pseudo, accuse: cible, description: description.trim() });
       setEnvoyee(true);
       setCible('');
       setDescription('');

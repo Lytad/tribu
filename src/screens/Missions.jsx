@@ -55,10 +55,24 @@ export default function Missions() {
     if (!propositionCourante) return;
     setChargementAction(true);
     try {
+      // On tente d'abord de sécuriser la mission (transaction) AVANT de débiter les points,
+      // pour ne jamais faire payer un joueur pour une mission que quelqu'un d'autre a prise
+      // au même moment.
+      try {
+        await marquerMissionActive(propositionCourante.id, pseudo);
+      } catch (err) {
+        if (err.message === 'MISSION_DEJA_PRISE') {
+          setErreur('Cette mission vient d\'être prise par quelqu\'un d\'autre — une nouvelle t\'est proposée.');
+          setPropositionCourante(null);
+          await piocher();
+          return;
+        }
+        throw err;
+      }
+
       if (avecLevier) {
         await ajusterScore(pseudo, POINTS.effetDeLevierCout);
       }
-      await marquerMissionActive(propositionCourante.id, pseudo);
       await definirMissionActive(pseudo, {
         missionId: propositionCourante.id,
         texte: propositionCourante.texte,

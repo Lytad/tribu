@@ -60,17 +60,18 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  font-size: 11px;
-  padding: 6px 4px;
+  font-size: 9.5px;
+  padding: 6px 2px;
   border-radius: 10px;
   flex: 1;
+  min-width: 0;
 }
 
 .nav-btn-active {
   color: var(--primary);
 }
 
-.nav-icon { font-size: 18px; }
+.nav-icon { font-size: 17px; }
 
 /* Login */
 .login-screen {
@@ -412,4 +413,96 @@
   color: var(--text-muted);
   font-size: 13px;
   text-decoration: underline;
+}
+
+/* Journal — fil d'actualité public, style chat */
+.journal-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.journal-fil {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.journal-separateur-jour {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 14px 0 8px;
+  position: relative;
+}
+
+.journal-bulle {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 14px;
+  max-width: 92%;
+}
+
+.journal-heure {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.journal-texte {
+  color: var(--text);
+  line-height: 1.4;
+}
+
+/* Bandeau Mode Test — très visible, ne peut pas être confondu avec le vrai jeu */
+.bandeau-test {
+  background: repeating-linear-gradient(45deg, #E08B2E, #E08B2E 10px, #C97A1E 10px, #C97A1E 20px);
+  color: white;
+  font-weight: 800;
+  font-size: 12px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  flex-wrap: wrap;
+}
+
+.bandeau-test-select {
+  background: white;
+  color: #C97A1E;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.bandeau-test-quitter {
+  background: rgba(0,0,0,0.3);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.bac-a-sable-section {
+  border: 1.5px dashed #E08B2E;
+  border-radius: 12px;
+  padding: 14px;
+  background: rgba(224, 139, 46, 0.06);
 }

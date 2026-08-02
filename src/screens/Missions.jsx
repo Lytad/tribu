@@ -4,38 +4,64 @@ import { piocherMission, marquerMissionActive, bruleMission, remettreDisponibleA
 import { ajusterScore, definirMissionActive, retirerMissionActive, mettreAJourJoueur } from '../firebase/joueurs';
 import { ajouterEntreeJournal } from '../firebase/journal';
 import { ajouterEvenement } from '../firebase/evenements';
+import {
+  piocherMissionTest, marquerMissionActiveTest, bruleMissionTest, remettreDisponibleApresAbandonTest,
+  ajusterScoreTest, definirMissionActiveTest, retirerMissionActiveTest, mettreAJourJoueurTest,
+  ajouterEntreeJournalTest, ajouterEvenementTest,
+} from '../firebase/sandbox';
 import { POINTS } from '../utils/constants';
 
 const LABELS_DIFFICULTE = { facile: 'Facile', moyenne: 'Moyenne', difficile: 'Difficile' };
 const LABELS_DIFFICULTE_MAJ = { facile: 'FACILE', moyenne: 'MOYENNE', difficile: 'DIFFICILE' };
 
 export default function Missions() {
-  const { pseudo, joueur, saison } = useGame();
+  const { pseudo, joueur, saison, modeTest } = useGame();
   const [propositionCourante, setPropositionCourante] = useState(null);
   const [chargementAction, setChargementAction] = useState(false);
   const [erreur, setErreur] = useState(null);
   const [confirmationReussite, setConfirmationReussite] = useState(false);
 
+  // Sélection des fonctions réelles ou de test selon le mode actif — un seul point de
+  // bascule, le reste du composant ne s'en soucie plus.
+  const fn = modeTest ? {
+    piocherMission: piocherMissionTest,
+    marquerMissionActive: marquerMissionActiveTest,
+    bruleMission: bruleMissionTest,
+    remettreDisponibleApresAbandon: remettreDisponibleApresAbandonTest,
+    ajusterScore: ajusterScoreTest,
+    definirMissionActive: definirMissionActiveTest,
+    retirerMissionActive: retirerMissionActiveTest,
+    mettreAJourJoueur: mettreAJourJoueurTest,
+    ajouterEntreeJournal: ajouterEntreeJournalTest,
+    ajouterEvenement: ajouterEvenementTest,
+  } : {
+    piocherMission, marquerMissionActive, bruleMission, remettreDisponibleApresAbandon,
+    ajusterScore, definirMissionActive, retirerMissionActive, mettreAJourJoueur,
+    ajouterEntreeJournal, ajouterEvenement,
+  };
+
   const missionActive = joueur?.missionActive || null;
 
   // Si aucune mission active et aucune proposition en attente, on pioche automatiquement
   useEffect(() => {
-    if (!missionActive && !propositionCourante && saison > 0) {
+    if (!missionActive && !propositionCourante && (saison > 0 || modeTest)) {
       piocher();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missionActive, saison]);
+  }, [missionActive, saison, modeTest]);
 
   async function piocher() {
     setErreur(null);
     setChargementAction(true);
     try {
       const difficulteForcee = joueur?.prochaineMissionForceeDifficile || null;
-      const mission = await piocherMission(saison, pseudo, difficulteForcee);
+      const mission = modeTest
+        ? await fn.piocherMission(pseudo, difficulteForcee)
+        : await fn.piocherMission(saison, pseudo, difficulteForcee);
       if (difficulteForcee) {
         // Le Ralentissement ne s'applique qu'une seule fois : on le consomme dès qu'on
         // a tenté de piocher avec, qu'une mission ait été trouvée ou non.
-        await mettreAJourJoueur(pseudo, { prochaineMissionForceeDifficile: null });
+        await fn.mettreAJourJoueur(pseudo, { prochaineMissionForceeDifficile: null });
       }
       if (!mission) {
         setErreur("Plus aucune mission disponible pour l'instant dans cette saison.");
@@ -51,7 +77,7 @@ export default function Missions() {
   async function passer() {
     setChargementAction(true);
     try {
-      await ajusterScore(pseudo, POINTS.passer);
+      await fn.ajusterScore(pseudo, POINTS.passer);
       setPropositionCourante(null);
       await piocher();
     } finally {
@@ -63,11 +89,10 @@ export default function Missions() {
     if (!propositionCourante) return;
     setChargementAction(true);
     try {
-      // On tente d'abord de sécuriser la mission (transaction) AVANT de débiter les points,
-      // pour ne jamais faire payer un joueur pour une mission que quelqu'un d'autre a prise
-      // au même moment.
+      // On tente d'abord de sécuriser la mission (transaction en mode réel) AVANT de débiter
+      // les points, pour ne jamais faire payer un joueur pour une mission déjà prise ailleurs.
       try {
-        await marquerMissionActive(propositionCourante.id, pseudo);
+        await fn.marquerMissionActive(propositionCourante.id, pseudo);
       } catch (err) {
         if (err.message === 'MISSION_DEJA_PRISE') {
           setErreur('Cette mission vient d\'être prise par quelqu\'un d\'autre — une nouvelle t\'est proposée.');
@@ -79,9 +104,9 @@ export default function Missions() {
       }
 
       if (avecLevier) {
-        await ajusterScore(pseudo, POINTS.effetDeLevierCout);
+        await fn.ajusterScore(pseudo, POINTS.effetDeLevierCout);
       }
-      await definirMissionActive(pseudo, {
+      await fn.definirMissionActive(pseudo, {
         missionId: propositionCourante.id,
         texte: propositionCourante.texte,
         difficulte: propositionCourante.difficulte,
@@ -102,8 +127,8 @@ export default function Missions() {
     setChargementAction(true);
     try {
       const pointsGagnes = missionActive.effetDeLevier ? missionActive.points * 2 : missionActive.points;
-      await ajusterScore(pseudo, pointsGagnes);
-      await ajouterEntreeJournal({
+      await fn.ajusterScore(pseudo, pointsGagnes);
+      await fn.ajouterEntreeJournal({
         pseudo,
         missionId: missionActive.missionId,
         texte: missionActive.texte,
@@ -113,9 +138,9 @@ export default function Missions() {
         preuveRequise: missionActive.preuveRequise,
         type: 'reussie',
       });
-      await bruleMission(missionActive.missionId);
-      await retirerMissionActive(pseudo);
-      await ajouterEvenement(`Une mission ${LABELS_DIFFICULTE_MAJ[missionActive.difficulte]} vient d'être réussie.`);
+      await fn.bruleMission(missionActive.missionId);
+      await fn.retirerMissionActive(pseudo);
+      await fn.ajouterEvenement(`Une mission ${LABELS_DIFFICULTE_MAJ[missionActive.difficulte]} vient d'être réussie.`);
       setConfirmationReussite(false);
     } finally {
       setChargementAction(false);
@@ -126,8 +151,8 @@ export default function Missions() {
     if (!missionActive) return;
     setChargementAction(true);
     try {
-      await ajusterScore(pseudo, POINTS.abandonner);
-      await ajouterEntreeJournal({
+      await fn.ajusterScore(pseudo, POINTS.abandonner);
+      await fn.ajouterEntreeJournal({
         pseudo,
         missionId: missionActive.missionId,
         texte: missionActive.texte,
@@ -137,15 +162,15 @@ export default function Missions() {
         preuveRequise: missionActive.preuveRequise,
         type: 'abandonnee',
       });
-      await remettreDisponibleApresAbandon(missionActive.missionId, pseudo);
-      await retirerMissionActive(pseudo);
-      await ajouterEvenement(`Quelqu'un a abandonné une mission ${LABELS_DIFFICULTE_MAJ[missionActive.difficulte]}.`);
+      await fn.remettreDisponibleApresAbandon(missionActive.missionId, pseudo);
+      await fn.retirerMissionActive(pseudo);
+      await fn.ajouterEvenement(`Quelqu'un a abandonné une mission ${LABELS_DIFFICULTE_MAJ[missionActive.difficulte]}.`);
     } finally {
       setChargementAction(false);
     }
   }
 
-  if (saison === 0) {
+  if (saison === 0 && !modeTest) {
     return <div className="missions-screen"><p className="empty-state">Le jeu n'a pas encore commencé. Rendez-vous le 6 août !</p></div>;
   }
 

@@ -5,18 +5,43 @@ import { ecouterAccusationsEnAttente, traiterAccusation, traiterAccusationRedond
 import { ajusterScore, mettreAJourJoueur, retirerMissionActive } from '../../firebase/joueurs';
 import { bruleMission } from '../../firebase/missions';
 import { ajouterEvenement } from '../../firebase/evenements';
+import {
+  ecouterJournalTestEnAttente, cloturerEntreeJournalTest,
+  ecouterAccusationsTestEnAttente, traiterAccusationTest,
+  ajusterScoreTest, mettreAJourJoueurTest, retirerMissionActiveTest,
+  bruleMissionTest, ajouterEvenementTest,
+} from '../../firebase/sandbox';
 import { POINTS, heureDecimale, HEURE_DEBUT_TRIBUNAL, HEURE_FIN_TRIBUNAL } from '../../utils/constants';
 import { useEffect } from 'react';
 
 export default function Tribunal() {
-  const { tousJoueurs } = useGame();
+  const { tousJoueurs, modeTest } = useGame();
   const [journal, setJournal] = useState([]);
   const [accusations, setAccusations] = useState([]);
   const [accusationOuverte, setAccusationOuverte] = useState(null);
   const [missionChoisie, setMissionChoisie] = useState('');
 
+  const fn = modeTest ? {
+    ecouterJournalEnAttente: ecouterJournalTestEnAttente,
+    cloturerEntreeJournal: cloturerEntreeJournalTest,
+    ecouterAccusationsEnAttente: ecouterAccusationsTestEnAttente,
+    traiterAccusation: traiterAccusationTest,
+    // La version test n'a pas de traiterAccusationRedondante dédiée : on réutilise
+    // traiterAccusationTest avec le même libellé de résultat pour rester cohérent.
+    traiterAccusationRedondante: (id) => traiterAccusationTest(id, 'redondante'),
+    ajusterScore: ajusterScoreTest,
+    mettreAJourJoueur: mettreAJourJoueurTest,
+    retirerMissionActive: retirerMissionActiveTest,
+    bruleMission: bruleMissionTest,
+    ajouterEvenement: ajouterEvenementTest,
+  } : {
+    ecouterJournalEnAttente, cloturerEntreeJournal, ecouterAccusationsEnAttente, traiterAccusation,
+    traiterAccusationRedondante, ajusterScore, mettreAJourJoueur, retirerMissionActive,
+    bruleMission, ajouterEvenement,
+  };
+
   const heureActuelle = heureDecimale();
-  const dansLaFenetre = heureActuelle >= HEURE_DEBUT_TRIBUNAL || heureActuelle < HEURE_FIN_TRIBUNAL - 24 + 24; // toujours vrai la nuit ; on affiche juste un avertissement hors fenêtre
+  const dansLaFenetre = modeTest || heureActuelle >= HEURE_DEBUT_TRIBUNAL || heureActuelle < HEURE_FIN_TRIBUNAL - 24 + 24; // toujours vrai la nuit ; on affiche juste un avertissement hors fenêtre
 
   function formaterHeure(dateIso) {
     if (!dateIso) return '';
@@ -26,25 +51,24 @@ export default function Tribunal() {
   }
 
   useEffect(() => {
-    const unsub1 = ecouterJournalEnAttente(setJournal);
-    const unsub2 = ecouterAccusationsEnAttente(setAccusations);
+    const unsub1 = fn.ecouterJournalEnAttente(setJournal);
+    const unsub2 = fn.ecouterAccusationsEnAttente(setAccusations);
     return () => { unsub1(); unsub2(); };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modeTest]);
 
   const missionsReussiesOuAbandonnees = journal;
 
   async function validerMissionEntree(entree) {
-    await cloturerEntreeJournal(entree.id, 'validee');
-    // Les points ont déjà été crédités au moment du clic joueur ; le Tribunal officialise (scoreValide)
-    await ajusterScore(entree.pseudo, 0); // no-op, garde traçabilité
-    await mettreAJourJoueur(entree.pseudo, {});
+    await fn.cloturerEntreeJournal(entree.id, 'validee');
+    await fn.ajusterScore(entree.pseudo, 0); // no-op, garde traçabilité
+    await fn.mettreAJourJoueur(entree.pseudo, {});
   }
 
   async function invaliderMissionEntree(entree) {
-    await cloturerEntreeJournal(entree.id, 'invalidee_preuve');
+    await fn.cloturerEntreeJournal(entree.id, 'invalidee_preuve');
     if (entree.type === 'reussie') {
-      // Le joueur perd les points gagnés temporairement, sans malus supplémentaire
-      await ajusterScore(entree.pseudo, -entree.points);
+      await fn.ajusterScore(entree.pseudo, -entree.points);
     }
   }
 
@@ -55,8 +79,8 @@ export default function Tribunal() {
 
   async function jugerFausseAccusation() {
     if (!accusationOuverte) return;
-    await ajusterScore(accusationOuverte.accusateur, POINTS.fausseAccusation);
-    await traiterAccusation(accusationOuverte.id, 'fausse');
+    await fn.ajusterScore(accusationOuverte.accusateur, POINTS.fausseAccusation);
+    await fn.traiterAccusation(accusationOuverte.id, 'fausse');
     setAccusationOuverte(null);
   }
 
@@ -67,30 +91,23 @@ export default function Tribunal() {
     const missionActiveAccuse = accuseData?.missionActive;
     const pointsMission = missionActiveAccuse?.points || 0;
 
-    // L'accusé perd les points de la mission qu'il pensait valider + malus -10
-    await ajusterScore(accusationOuverte.accuse, -(pointsMission + Math.abs(POINTS.accuseMalus)));
-    // L'accusateur vole le pactole complet (points de la mission + 10)
-    await ajusterScore(accusationOuverte.accusateur, pointsMission + 10);
+    await fn.ajusterScore(accusationOuverte.accuse, -(pointsMission + Math.abs(POINTS.accuseMalus)));
+    await fn.ajusterScore(accusationOuverte.accusateur, pointsMission + 10);
 
-    // La mission démasquée est consommée : brûlée définitivement (comme une mission réussie),
-    // et retirée de l'écran de l'accusé pour qu'il ne puisse plus la valider a posteriori.
     if (missionActiveAccuse?.missionId) {
-      await bruleMission(missionActiveAccuse.missionId);
+      await fn.bruleMission(missionActiveAccuse.missionId);
     }
-    await retirerMissionActive(accusationOuverte.accuse);
+    await fn.retirerMissionActive(accusationOuverte.accuse);
 
-    await traiterAccusation(accusationOuverte.id, 'validee');
-    await ajouterEvenement(`${accusationOuverte.accuse} a été démasqué(e) au Tribunal.`);
+    await fn.traiterAccusation(accusationOuverte.id, 'validee');
+    await fn.ajouterEvenement(`${accusationOuverte.accuse} a été démasqué(e) au Tribunal.`);
     setAccusationOuverte(null);
   }
 
   async function jugerAccusationValideeSurAbandon() {
     if (!accusationOuverte) return;
-    // L'accusé avait vraiment cette mission mais l'a abandonnée avant le Tribunal — il a déjà
-    // payé le prix de l'abandon (-5 pts ou Amnésie), donc pas de malus supplémentaire ici.
-    // L'accusateur touche un bonus fixe, puisque la mission n'a rapporté aucun point à l'accusé.
-    await ajusterScore(accusationOuverte.accusateur, 10);
-    await traiterAccusation(accusationOuverte.id, 'validee_mission_abandonnee');
+    await fn.ajusterScore(accusationOuverte.accusateur, 10);
+    await fn.traiterAccusation(accusationOuverte.id, 'validee_mission_abandonnee');
     setAccusationOuverte(null);
   }
 
@@ -99,30 +116,27 @@ export default function Tribunal() {
     const accuseData = tousJoueurs[accusationOuverte.accuse];
     const missionActiveAccuse = accuseData?.missionActive;
 
-    // Neutre : personne ne gagne ni ne perd de points. La mission reste tout de même
-    // démasquée (brûlée + retirée), puisqu'elle a été révélée au grand jour au Tribunal.
     if (missionActiveAccuse?.missionId) {
-      await bruleMission(missionActiveAccuse.missionId);
+      await fn.bruleMission(missionActiveAccuse.missionId);
     }
-    await retirerMissionActive(accusationOuverte.accuse);
-    // L'Amnésie est consommée : elle ne protège qu'une seule fois par jour.
-    await mettreAJourJoueur(accusationOuverte.accuse, { amnesieActiveJusqua: null });
+    await fn.retirerMissionActive(accusationOuverte.accuse);
+    await fn.mettreAJourJoueur(accusationOuverte.accuse, { amnesieActiveJusqua: null });
 
-    await traiterAccusation(accusationOuverte.id, 'validee_amnesie');
+    await fn.traiterAccusation(accusationOuverte.id, 'validee_amnesie');
     setAccusationOuverte(null);
   }
 
   async function jugerDelitInitie() {
     if (!accusationOuverte) return;
-    await ajusterScore(accusationOuverte.accusateur, POINTS.delitInitieMalus);
-    await ajusterScore(accusationOuverte.accuse, POINTS.delitInitieMalus);
-    await traiterAccusation(accusationOuverte.id, 'delit_initie');
+    await fn.ajusterScore(accusationOuverte.accusateur, POINTS.delitInitieMalus);
+    await fn.ajusterScore(accusationOuverte.accuse, POINTS.delitInitieMalus);
+    await fn.traiterAccusation(accusationOuverte.id, 'delit_initie');
     setAccusationOuverte(null);
   }
 
   async function jugerRedondante() {
     if (!accusationOuverte) return;
-    await traiterAccusationRedondante(accusationOuverte.id);
+    await fn.traiterAccusationRedondante(accusationOuverte.id);
     setAccusationOuverte(null);
   }
 
@@ -154,7 +168,7 @@ export default function Tribunal() {
 
   return (
     <div className="tribunal-screen">
-      <h2 className="dashboard-title">⚖️ Tribunal du Soir</h2>
+      <h2 className="dashboard-title">⚖️ Tribunal du Soir{modeTest ? ' (Bac à Sable)' : ''}</h2>
       {!dansLaFenetre && (
         <p className="warning-text">Hors fenêtre habituelle (21h00–00h00), mais tu peux quand même traiter le report.</p>
       )}

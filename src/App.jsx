@@ -23,7 +23,10 @@ const ONGLETS = [
 ];
 
 function AppContent() {
-  const { pseudo, joueur, chargement } = useGame();
+  const {
+    pseudo, joueur, chargement, modeTest, pseudoTest, setPseudoTest,
+    quitterModeTest, pseudoReelAdmin,
+  } = useGame();
   const [onglet, setOnglet] = useState('dashboard');
   const [adminDeverrouille, setAdminDeverrouille] = useState(false);
   const [pinOuvert, setPinOuvert] = useState(false);
@@ -34,11 +37,29 @@ function AppContent() {
     return <div className="login-screen"><p className="empty-state">Chargement...</p></div>;
   }
 
-  const estAdmin = pseudo === ADMIN_PSEUDO;
+  // L'accès admin reste basé sur le VRAI pseudo AD, même en mode test — sinon incarner
+  // TEST1/TEST2 ferait perdre l'accès au Tribunal et au God Mode.
+  const estAdmin = pseudoReelAdmin === ADMIN_PSEUDO;
+
+  const bandeauTest = modeTest && (
+    <div className="bandeau-test">
+      🧪 MODE TEST — tu incarnes
+      <select
+        className="bandeau-test-select"
+        value={pseudoTest}
+        onChange={(e) => setPseudoTest(e.target.value)}
+      >
+        <option value="TEST1">TEST1</option>
+        <option value="TEST2">TEST2</option>
+      </select>
+      <button className="bandeau-test-quitter" onClick={quitterModeTest}>Quitter</button>
+    </div>
+  );
 
   if (estAdmin && adminDeverrouille) {
     return (
       <div className="app-shell">
+        {bandeauTest}
         <header className="app-header">
           <span className="app-header-title">TRIBU — Admin</span>
           <button className="btn-lien" onClick={() => setAdminDeverrouille(false)}>Quitter l'admin</button>
@@ -56,6 +77,7 @@ function AppContent() {
 
   return (
     <div className="app-shell">
+      {bandeauTest}
       <header className="app-header">
         <span className="app-header-title">TRIBU</span>
         <span className="app-header-score">{joueur.score || 0} pts</span>

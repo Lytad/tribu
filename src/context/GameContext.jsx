@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { assurerJoueur, ecouterJoueur, ecouterTousJoueurs } from '../firebase/joueurs';
 import { ecouterForceRefresh } from '../firebase/godmode';
 import { ajouterEvenement } from '../firebase/evenements';
+import { ecouterJoueurTest, ecouterTousJoueursTest } from '../firebase/sandbox';
 import { saisonActuelle, ADMIN_PSEUDO } from '../utils/constants';
 
 const GameContext = createContext(null);
@@ -15,6 +16,11 @@ export function GameProvider({ children }) {
   const [chargement, setChargement] = useState(true);
   const [saison, setSaison] = useState(() => saisonActuelle());
   const dernierLeaderRef = useRef(null);
+
+  // Mode test (Bac à Sable) : bascule toute l'app sur les données isolées de test.
+  // pseudoTest indique lequel des deux joueurs fictifs (TEST1/TEST2) l'admin incarne.
+  const [modeTest, setModeTest] = useState(false);
+  const [pseudoTest, setPseudoTestState] = useState('TEST1');
 
   // Bascule automatique de saison, vérifiée chaque minute
   useEffect(() => {
@@ -32,7 +38,9 @@ export function GameProvider({ children }) {
     return unsub;
   }, []);
 
+  // Chargement du joueur réel — désactivé pendant le mode test
   useEffect(() => {
+    if (modeTest) return;
     if (!pseudo) { setChargement(false); return; }
     setChargement(true);
     assurerJoueur(pseudo).then(() => {
@@ -42,17 +50,35 @@ export function GameProvider({ children }) {
       });
       return unsub;
     });
-  }, [pseudo]);
+  }, [pseudo, modeTest]);
+
+  // Chargement du joueur de test — actif uniquement en mode test
+  useEffect(() => {
+    if (!modeTest) return;
+    setChargement(true);
+    const unsub = ecouterJoueurTest(pseudoTest, (data) => {
+      setJoueur(data);
+      setChargement(false);
+    });
+    return unsub;
+  }, [modeTest, pseudoTest]);
 
   useEffect(() => {
+    if (modeTest) return;
     const unsub = ecouterTousJoueurs(setTousJoueurs);
     return unsub;
-  }, []);
+  }, [modeTest]);
 
-  // Détection du changement de leader — uniquement depuis le compte AD, pour éviter que
-  // chaque téléphone connecté ne génère le même événement en double dans le Journal.
   useEffect(() => {
-    if (pseudo !== ADMIN_PSEUDO) return;
+    if (!modeTest) return;
+    const unsub = ecouterTousJoueursTest(setTousJoueurs);
+    return unsub;
+  }, [modeTest]);
+
+  // Détection du changement de leader — uniquement depuis le compte AD et hors mode test,
+  // pour éviter que chaque téléphone connecté ne génère le même événement en double.
+  useEffect(() => {
+    if (pseudo !== ADMIN_PSEUDO || modeTest) return;
     const classement = Object.entries(tousJoueurs)
       .map(([p, data]) => ({ pseudo: p, score: data.score || 0 }))
       .sort((a, b) => b.score - a.score);
@@ -68,7 +94,7 @@ export function GameProvider({ children }) {
       dernierLeaderRef.current = leaderActuel;
       ajouterEvenement(`${leaderActuel} est passé(e) en tête du classement !`);
     }
-  }, [tousJoueurs, pseudo]);
+  }, [tousJoueurs, pseudo, modeTest]);
 
   function connecter(nouveauPseudo) {
     localStorage.setItem(STORAGE_KEY, nouveauPseudo);
@@ -81,8 +107,33 @@ export function GameProvider({ children }) {
     setJoueur(null);
   }
 
+  async function entrerModeTest() {
+    setModeTest(true);
+    setPseudoTestState('TEST1');
+  }
+
+  function quitterModeTest() {
+    setModeTest(false);
+  }
+
+  function setPseudoTest(nouveauPseudoTest) {
+    setPseudoTestState(nouveauPseudoTest);
+  }
+
   const value = {
-    pseudo, joueur, tousJoueurs, chargement, saison, connecter, deconnecter,
+    pseudo: modeTest ? pseudoTest : pseudo,
+    joueur,
+    tousJoueurs,
+    chargement,
+    saison: modeTest ? 1 : saison,
+    connecter,
+    deconnecter,
+    modeTest,
+    pseudoTest,
+    entrerModeTest,
+    quitterModeTest,
+    setPseudoTest,
+    pseudoReelAdmin: pseudo, // conserve le vrai pseudo (AD) pour savoir qui a le droit d'activer/quitter
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

@@ -20,14 +20,13 @@ export default function Tribunal() {
   const [accusations, setAccusations] = useState([]);
   const [accusationOuverte, setAccusationOuverte] = useState(null);
   const [missionChoisie, setMissionChoisie] = useState('');
+  const [idsEnTraitement, setIdsEnTraitement] = useState(new Set());
 
   const fn = modeTest ? {
     ecouterJournalEnAttente: ecouterJournalTestEnAttente,
     cloturerEntreeJournal: cloturerEntreeJournalTest,
     ecouterAccusationsEnAttente: ecouterAccusationsTestEnAttente,
     traiterAccusation: traiterAccusationTest,
-    // La version test n'a pas de traiterAccusationRedondante dédiée : on réutilise
-    // traiterAccusationTest avec le même libellé de résultat pour rester cohérent.
     traiterAccusationRedondante: (id) => traiterAccusationTest(id, 'redondante'),
     ajusterScore: ajusterScoreTest,
     mettreAJourJoueur: mettreAJourJoueurTest,
@@ -41,7 +40,7 @@ export default function Tribunal() {
   };
 
   const heureActuelle = heureDecimale();
-  const dansLaFenetre = modeTest || heureActuelle >= HEURE_DEBUT_TRIBUNAL || heureActuelle < HEURE_FIN_TRIBUNAL - 24 + 24; // toujours vrai la nuit ; on affiche juste un avertissement hors fenêtre
+  const dansLaFenetre = modeTest || heureActuelle >= HEURE_DEBUT_TRIBUNAL || heureActuelle < HEURE_FIN_TRIBUNAL - 24 + 24;
 
   function formaterHeure(dateIso) {
     if (!dateIso) return '';
@@ -59,16 +58,44 @@ export default function Tribunal() {
 
   const missionsReussiesOuAbandonnees = journal;
 
+  function marquerEnTraitement(id) {
+    setIdsEnTraitement((prev) => new Set(prev).add(id));
+  }
+
+  function demarquerEnTraitement(id) {
+    setIdsEnTraitement((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  function entreeEncoreEnAttente(entreeId) {
+    return journal.some((e) => e.id === entreeId);
+  }
+
   async function validerMissionEntree(entree) {
-    await fn.cloturerEntreeJournal(entree.id, 'validee');
-    await fn.ajusterScore(entree.pseudo, 0); // no-op, garde traçabilité
-    await fn.mettreAJourJoueur(entree.pseudo, {});
+    if (!entreeEncoreEnAttente(entree.id) || idsEnTraitement.has(entree.id)) return;
+    marquerEnTraitement(entree.id);
+    try {
+      await fn.cloturerEntreeJournal(entree.id, 'validee');
+      await fn.ajusterScore(entree.pseudo, 0);
+      await fn.mettreAJourJoueur(entree.pseudo, {});
+    } finally {
+      demarquerEnTraitement(entree.id);
+    }
   }
 
   async function invaliderMissionEntree(entree) {
-    await fn.cloturerEntreeJournal(entree.id, 'invalidee_preuve');
-    if (entree.type === 'reussie') {
-      await fn.ajusterScore(entree.pseudo, -entree.points);
+    if (!entreeEncoreEnAttente(entree.id) || idsEnTraitement.has(entree.id)) return;
+    marquerEnTraitement(entree.id);
+    try {
+      await fn.cloturerEntreeJournal(entree.id, 'invalidee_preuve');
+      if (entree.type === 'reussie') {
+        await fn.ajusterScore(entree.pseudo, -entree.points);
+      }
+    } finally {
+      demarquerEnTraitement(entree.id);
     }
   }
 
@@ -77,15 +104,19 @@ export default function Tribunal() {
     setMissionChoisie('');
   }
 
+  function accusationEncoreEnAttente() {
+    return accusationOuverte && accusations.some((a) => a.id === accusationOuverte.id);
+  }
+
   async function jugerFausseAccusation() {
-    if (!accusationOuverte) return;
+    if (!accusationEncoreEnAttente()) { setAccusationOuverte(null); return; }
     await fn.ajusterScore(accusationOuverte.accusateur, POINTS.fausseAccusation);
     await fn.traiterAccusation(accusationOuverte.id, 'fausse');
     setAccusationOuverte(null);
   }
 
   async function jugerAccusationValidee() {
-    if (!accusationOuverte) return;
+    if (!accusationEncoreEnAttente()) { setAccusationOuverte(null); return; }
     const accuseData = tousJoueurs[accusationOuverte.accuse];
 
     const missionActiveAccuse = accuseData?.missionActive;
@@ -101,18 +132,20 @@ export default function Tribunal() {
 
     await fn.traiterAccusation(accusationOuverte.id, 'validee');
     await fn.ajouterEvenement(`${accusationOuverte.accuse} a été démasqué(e) au Tribunal.`);
+    await fn.ajouterEvenement('Quelqu\'un a validé une accusation.');
     setAccusationOuverte(null);
   }
 
   async function jugerAccusationValideeSurAbandon() {
-    if (!accusationOuverte) return;
+    if (!accusationEncoreEnAttente()) { setAccusationOuverte(null); return; }
     await fn.ajusterScore(accusationOuverte.accusateur, 10);
     await fn.traiterAccusation(accusationOuverte.id, 'validee_mission_abandonnee');
+    await fn.ajouterEvenement('Quelqu\'un a validé une accusation.');
     setAccusationOuverte(null);
   }
 
   async function jugerAccusationValideeAvecAmnesie() {
-    if (!accusationOuverte) return;
+    if (!accusationEncoreEnAttente()) { setAccusationOuverte(null); return; }
     const accuseData = tousJoueurs[accusationOuverte.accuse];
     const missionActiveAccuse = accuseData?.missionActive;
 
@@ -127,7 +160,7 @@ export default function Tribunal() {
   }
 
   async function jugerDelitInitie() {
-    if (!accusationOuverte) return;
+    if (!accusationEncoreEnAttente()) { setAccusationOuverte(null); return; }
     await fn.ajusterScore(accusationOuverte.accusateur, POINTS.delitInitieMalus);
     await fn.ajusterScore(accusationOuverte.accuse, POINTS.delitInitieMalus);
     await fn.traiterAccusation(accusationOuverte.id, 'delit_initie');
@@ -135,14 +168,11 @@ export default function Tribunal() {
   }
 
   async function jugerRedondante() {
-    if (!accusationOuverte) return;
+    if (!accusationEncoreEnAttente()) { setAccusationOuverte(null); return; }
     await fn.traiterAccusationRedondante(accusationOuverte.id);
     setAccusationOuverte(null);
   }
 
-  // Pour chaque accusation, on repère si elle est la première (par ordre chronologique,
-  // déjà garanti par le tri Firestore) à viser cette cible parmi les accusations en attente.
-  // Les suivantes sur la même cible sont signalées comme doublons potentiels.
   const premiereParCible = {};
   accusations.forEach((acc) => {
     if (!(acc.accuse in premiereParCible)) {
@@ -150,18 +180,12 @@ export default function Tribunal() {
     }
   });
 
-  // Pour l'accusation actuellement ouverte : est-ce que l'accusé n'a plus de mission active
-  // (donc soit réussie, soit abandonnée) ? Si oui, on retrouve la dernière entrée de journal
-  // le concernant pour afficher ce qu'il en est réellement.
   function derniereEntreeJournalPour(pseudoAccuse) {
     const entrees = journal.filter((e) => e.pseudo === pseudoAccuse);
     if (entrees.length === 0) return null;
     return entrees[entrees.length - 1];
   }
 
-  // Tout l'historique du jour pour un joueur (missions terminées/abandonnées), trié
-  // chronologiquement — permet de retrouver quelle mission correspond à quelle accusation
-  // quand plusieurs missions se sont enchaînées dans la même journée.
   function historiqueJournalPour(pseudoAccuse) {
     return journal.filter((e) => e.pseudo === pseudoAccuse);
   }
@@ -176,28 +200,31 @@ export default function Tribunal() {
       <section className="tribunal-section">
         <h3>Débrief — Missions terminées / abandonnées en attente</h3>
         {missionsReussiesOuAbandonnees.length === 0 && <p className="empty-state">Rien en attente.</p>}
-        {missionsReussiesOuAbandonnees.map((entree) => (
-          <div key={entree.id} className="tribunal-item">
-            <div className="tribunal-item-header">
-              <strong>{entree.pseudo}</strong>
-              <span className={`badge ${entree.type === 'reussie' ? 'badge-success' : 'badge-danger'}`}>
-                {entree.type === 'reussie' ? 'Réussie' : 'Abandonnée'}
-              </span>
-              {entree.preuveRequise && <span className="badge badge-preuve">📷 Preuve requise</span>}
-            </div>
-            <p>{entree.texte}</p>
-            <p className="dashboard-note">{entree.points} pts {entree.effetDeLevier && '(effet de levier)'}</p>
-            {entree.type === 'reussie' && entree.preuveRequise && (
-              <div className="mission-actions">
-                <button className="btn btn-success" onClick={() => validerMissionEntree(entree)}>Preuve OK — Valider</button>
-                <button className="btn btn-danger" onClick={() => invaliderMissionEntree(entree)}>Pas de preuve — Invalider</button>
+        {missionsReussiesOuAbandonnees.map((entree) => {
+          const enTraitement = idsEnTraitement.has(entree.id);
+          return (
+            <div key={entree.id} className={`tribunal-item ${enTraitement ? 'tribunal-item-en-traitement' : ''}`}>
+              <div className="tribunal-item-header">
+                <strong>{entree.pseudo}</strong>
+                <span className={`badge ${entree.type === 'reussie' ? 'badge-success' : 'badge-danger'}`}>
+                  {entree.type === 'reussie' ? 'Réussie' : 'Abandonnée'}
+                </span>
+                {entree.preuveRequise && <span className="badge badge-preuve">📷 Preuve requise</span>}
               </div>
-            )}
-            {(entree.type === 'abandonnee' || !entree.preuveRequise) && (
-              <button className="btn btn-secondary" onClick={() => validerMissionEntree(entree)}>Acter (clore)</button>
-            )}
-          </div>
-        ))}
+              <p>{entree.texte}</p>
+              <p className="dashboard-note">{entree.points} pts {entree.effetDeLevier && '(effet de levier)'}</p>
+              {entree.type === 'reussie' && entree.preuveRequise && (
+                <div className="mission-actions">
+                  <button className="btn btn-success" onClick={() => validerMissionEntree(entree)} disabled={enTraitement}>Preuve OK — Valider</button>
+                  <button className="btn btn-danger" onClick={() => invaliderMissionEntree(entree)} disabled={enTraitement}>Pas de preuve — Invalider</button>
+                </div>
+              )}
+              {(entree.type === 'abandonnee' || !entree.preuveRequise) && (
+                <button className="btn btn-secondary" onClick={() => validerMissionEntree(entree)} disabled={enTraitement}>Acter (clore)</button>
+              )}
+            </div>
+          );
+        })}
       </section>
 
       <section className="tribunal-section">

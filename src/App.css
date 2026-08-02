@@ -31,6 +31,30 @@
   font-size: 16px;
 }
 
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-regles {
+  background: var(--bg-card-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 16px;
+  padding: 6px 9px;
+  line-height: 1;
+}
+
+.btn-regles:active {
+  transform: scale(0.95);
+}
+
+.modal-content-large {
+  max-width: 480px;
+  max-height: 88vh;
+}
+
 .app-main {
   flex: 1;
   overflow-y: auto;
@@ -505,4 +529,76 @@
   border-radius: 12px;
   padding: 14px;
   background: rgba(224, 139, 46, 0.06);
+}
+
+.tribunal-item-en-traitement {
+  opacity: 0.45;
+  pointer-events: none;
+  position: relative;
+}
+
+/* Écran Règles — accordéon par catégorie */
+.regles-screen {
+  display: flex;
+  flex-direction: column;
+}
+
+.regles-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.regles-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.regles-section-titre {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 14px 16px;
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+}
+
+.regles-chevron {
+  color: var(--primary);
+  font-size: 20px;
+  font-weight: 900;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.regles-section-contenu {
+  padding: 0 16px 16px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.regles-section-contenu p {
+  margin: 0 0 10px;
+}
+
+.regles-section-contenu ul {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.regles-section-contenu li {
+  margin-bottom: 6px;
+}
+
+.regles-section-contenu strong {
+  color: var(--primary);
 }

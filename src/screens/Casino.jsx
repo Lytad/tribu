@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { ajusterScore, mettreAJourJoueur } from '../firebase/joueurs';
+import { ajusterScoreTest, mettreAJourJoueurTest } from '../firebase/sandbox';
 import { CASINO } from '../utils/constants';
 
 function aujourdhuiStr() {
@@ -8,10 +9,14 @@ function aujourdhuiStr() {
 }
 
 export default function Casino() {
-  const { pseudo, joueur } = useGame();
+  const { pseudo, joueur, modeTest } = useGame();
   const [mise, setMise] = useState('');
   const [resultat, setResultat] = useState(null);
   const [chargement, setChargement] = useState(false);
+
+  const fn = modeTest
+    ? { ajusterScore: ajusterScoreTest, mettreAJourJoueur: mettreAJourJoueurTest }
+    : { ajusterScore, mettreAJourJoueur };
 
   const solde = joueur?.score || 0;
   const miseMax = Math.floor(solde * CASINO.miseMaxRatio);
@@ -36,10 +41,10 @@ export default function Casino() {
         : Math.round(miseNum * CASINO.multiplicateurDefaite);
       const delta = gain - miseNum;
 
-      await ajusterScore(pseudo, delta);
+      await fn.ajusterScore(pseudo, delta);
 
       const nouveauBenefice = (joueur?.casinoDateJour === jourCourant ? (joueur?.casinoBeneficeJour || 0) : 0) + Math.max(delta, 0);
-      await mettreAJourJoueur(pseudo, {
+      await fn.mettreAJourJoueur(pseudo, {
         casinoDateJour: jourCourant,
         casinoBeneficeJour: nouveauBenefice,
       });

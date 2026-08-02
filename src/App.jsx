@@ -7,6 +7,7 @@ import Accusation from './screens/Accusation';
 import Boutique from './screens/Boutique';
 import Casino from './screens/Casino';
 import Journal from './screens/Journal';
+import Regles from './screens/Regles';
 import AdminPin from './screens/admin/AdminPin';
 import Tribunal from './screens/admin/Tribunal';
 import GodMode from './screens/admin/GodMode';
@@ -30,6 +31,7 @@ function AppContent() {
   const [onglet, setOnglet] = useState('dashboard');
   const [adminDeverrouille, setAdminDeverrouille] = useState(false);
   const [pinOuvert, setPinOuvert] = useState(false);
+  const [reglesOuvertes, setReglesOuvertes] = useState(false);
   const [vueAdmin, setVueAdmin] = useState('tribunal'); // 'tribunal' | 'godmode'
 
   if (!pseudo) return <Login />;
@@ -56,6 +58,17 @@ function AppContent() {
     </div>
   );
 
+  const modaleRegles = reglesOuvertes && (
+    <div className="modal-overlay" onClick={() => setReglesOuvertes(false)}>
+      <div className="modal-content modal-content-large" onClick={(e) => e.stopPropagation()}>
+        <Regles />
+        <button className="btn btn-secondary" onClick={() => setReglesOuvertes(false)} style={{ marginTop: 16 }}>
+          Fermer
+        </button>
+      </div>
+    </div>
+  );
+
   if (estAdmin && adminDeverrouille) {
     return (
       <div className="app-shell">
@@ -71,6 +84,7 @@ function AppContent() {
         <main className="app-main">
           {vueAdmin === 'tribunal' ? <Tribunal /> : <GodMode />}
         </main>
+        {modaleRegles}
       </div>
     );
   }
@@ -80,7 +94,10 @@ function AppContent() {
       {bandeauTest}
       <header className="app-header">
         <span className="app-header-title">TRIBU</span>
-        <span className="app-header-score">{joueur.score || 0} pts</span>
+        <div className="app-header-actions">
+          <button className="btn-regles" onClick={() => setReglesOuvertes(true)}>📖</button>
+          <span className="app-header-score">{joueur.score || 0} pts</span>
+        </div>
       </header>
 
       <main className="app-main">
@@ -118,6 +135,8 @@ function AppContent() {
           </div>
         </div>
       )}
+
+      {modaleRegles}
     </div>
   );
 }

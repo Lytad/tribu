@@ -1,6 +1,6 @@
 import {
   doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, query, where,
-  writeBatch, addDoc, orderBy,
+  writeBatch, addDoc,
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -86,7 +86,7 @@ export async function reinitialiserMissionsTest() {
   MISSIONS_TEST_SEED.forEach((m) => {
     batch.set(doc(missionsTestRef, m.id), {
       ...m,
-      saison: 1, // fixe, sans lien avec la vraie saison du jeu
+      saison: 1,
       statut: 'disponible',
       joueurActuel: null,
       joueursExclus: [],
@@ -251,9 +251,13 @@ export async function creerAccusationTest({ accusateur, accuse, description }) {
 }
 
 export function ecouterAccusationsTestEnAttente(callback) {
-  const q = query(accusationsTestRef, where('statut', '==', 'en_attente'), orderBy('createdAt', 'asc'));
+  const q = query(accusationsTestRef, where('statut', '==', 'en_attente'));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    items.sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+    callback(items);
+  }, (erreur) => {
+    console.error('Erreur écoute accusations test:', erreur);
   });
 }
 
@@ -276,9 +280,13 @@ export async function ajouterEntreeJournalTest(entree) {
 }
 
 export function ecouterJournalTestEnAttente(callback) {
-  const q = query(journalTestRef, where('statut', '==', 'en_attente'), orderBy('createdAt', 'asc'));
+  const q = query(journalTestRef, where('statut', '==', 'en_attente'));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    items.sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+    callback(items);
+  }, (erreur) => {
+    console.error('Erreur écoute journal test:', erreur);
   });
 }
 
@@ -297,9 +305,12 @@ export async function ajouterEvenementTest(texte) {
 }
 
 export function ecouterEvenementsTest(callback) {
-  const q = query(evenementsTestRef, orderBy('createdAt', 'asc'));
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  return onSnapshot(evenementsTestRef, (snap) => {
+    const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    items.sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+    callback(items);
+  }, (erreur) => {
+    console.error('Erreur écoute événements test:', erreur);
   });
 }
 

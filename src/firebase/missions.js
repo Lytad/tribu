@@ -1,5 +1,5 @@
 import {
-  doc, getDocs, updateDoc, query, collection, where, writeBatch, onSnapshot, limit,
+  doc, getDocs, getDoc, updateDoc, query, collection, where, writeBatch, onSnapshot, limit, runTransaction,
 } from 'firebase/firestore';
 import { db } from './config';
 import missionsSeed from '../data/missions.seed.json';
@@ -45,10 +45,17 @@ export async function piocherMission(saison, pseudo) {
   return { id: choix.id, ...choix.data() };
 }
 
+// Marque une mission comme active pour un joueur, en toute sécurité : si un autre joueur l'a
+// déjà acceptée entre-temps (statut plus 'disponible'), l'opération échoue au lieu d'écraser
+// silencieusement l'assignation de l'autre joueur.
 export async function marquerMissionActive(missionId, pseudo) {
-  await updateDoc(doc(missionsRef, missionId), {
-    statut: 'active',
-    joueurActuel: pseudo,
+  const ref = doc(missionsRef, missionId);
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists() || snap.data().statut !== 'disponible') {
+      throw new Error('MISSION_DEJA_PRISE');
+    }
+    transaction.update(ref, { statut: 'active', joueurActuel: pseudo });
   });
 }
 

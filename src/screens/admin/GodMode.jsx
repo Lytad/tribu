@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { ajusterScore, retirerMissionActive } from '../../firebase/joueurs';
-import { initialiserMissions, verifierBaseInitialisee, ecouterStatsMissions } from '../../firebase/missions';
+import { initialiserMissions, verifierBaseInitialisee, ecouterStatsMissions, remettreDisponible } from '../../firebase/missions';
 import { declencherForceRefresh } from '../../firebase/godmode';
 import { ecouterAccusationsEnAttente, supprimerAccusationBug } from '../../firebase/accusations';
 import { TOUS_JOUEURS } from '../../utils/constants';
@@ -50,8 +50,12 @@ export default function GodMode() {
 
   async function forcerAbandon() {
     if (!cibleKill) return;
+    const missionActiveCible = tousJoueurs[cibleKill]?.missionActive;
+    if (missionActiveCible?.missionId) {
+      await remettreDisponible(missionActiveCible.missionId);
+    }
     await retirerMissionActive(cibleKill);
-    afficherMessage(`Mission de ${cibleKill} nettoyée (sans malus).`);
+    afficherMessage(`Mission de ${cibleKill} nettoyée (sans malus) et remise disponible pour tout le monde.`);
     setCibleKill('');
   }
 

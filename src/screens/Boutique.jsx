@@ -2,48 +2,62 @@ import { useState } from 'react';
 import { useGame } from '../context/GameContext';
 import { ajusterScore, mettreAJourJoueur } from '../firebase/joueurs';
 import { sabrerMissionCible } from '../firebase/missions';
-import { POINTS, TOUS_JOUEURS, heureDecimale, HEURE_DEBUT_ACHAT_CAPE, HEURE_FIN_ACHAT_CAPE } from '../utils/constants';
+import { ajouterEvenement } from '../firebase/evenements';
+import { POINTS, TOUS_JOUEURS } from '../utils/constants';
+
+function finDeJournee() {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
+}
 
 export default function Boutique() {
   const { pseudo, joueur, tousJoueurs } = useGame();
   const [cibleGel, setCibleGel] = useState('');
   const [cibleSabotage, setCibleSabotage] = useState('');
+  const [cibleIndice, setCibleIndice] = useState('');
+  const [cibleUsurpation, setCibleUsurpation] = useState('');
+  const [cibleRalentissement, setCibleRalentissement] = useState('');
+  const [indiceResultat, setIndiceResultat] = useState(null);
   const [message, setMessage] = useState(null);
   const [chargement, setChargement] = useState(false);
 
   const solde = joueur?.score || 0;
-  const heureActuelle = heureDecimale();
-  const capeAchetable = heureActuelle >= HEURE_DEBUT_ACHAT_CAPE && heureActuelle <= HEURE_FIN_ACHAT_CAPE;
-
   const autresJoueurs = Object.keys(tousJoueurs).filter((p) => p !== pseudo && TOUS_JOUEURS.includes(p));
+
+  const amnesieActive = joueur?.amnesieActiveJusqua && new Date(joueur.amnesieActiveJusqua) > new Date();
 
   function afficherMessage(txt) {
     setMessage(txt);
-    setTimeout(() => setMessage(null), 4000);
+    setTimeout(() => setMessage(null), 5000);
   }
 
   async function acheterAmnesie() {
+    if (amnesieActive) return afficherMessage('Tu as déjà une Amnésie active pour aujourd\'hui.');
     if (solde < POINTS.amnesieCout) return afficherMessage('Solde insuffisant.');
     setChargement(true);
     try {
       await ajusterScore(pseudo, -POINTS.amnesieCout);
-      const nb = (joueur.inventaire?.amnesieDisponible || 0) + 1;
-      await mettreAJourJoueur(pseudo, { 'inventaire.amnesieDisponible': nb });
-      afficherMessage('Amnésie achetée. Utilisable lors du prochain abandon de mission.');
+      await mettreAJourJoueur(pseudo, { amnesieActiveJusqua: finDeJournee() });
+      await ajouterEvenement('Quelqu\'un s\'est protégé pour la journée.');
+      afficherMessage('Amnésie activée pour la journée. Si une accusation contre toi est validée ce soir, tu pourras choisir de l\'annuler au Tribunal.');
     } finally {
       setChargement(false);
     }
   }
 
-  async function acheterCape() {
-    if (!capeAchetable) return afficherMessage('La Cape ne peut être achetée qu\'entre 00h01 et 20h59.');
-    if (solde < POINTS.capeCout) return afficherMessage('Solde insuffisant.');
+  async function acheterIndice() {
+    if (!cibleIndice) return afficherMessage('Choisis une cible.');
+    if (solde < POINTS.indiceCout) return afficherMessage('Solde insuffisant.');
+    const cibleData = tousJoueurs[cibleIndice];
+    if (!cibleData?.missionActive) {
+      return afficherMessage(`${cibleIndice} n'a pas de mission active en ce moment.`);
+    }
     setChargement(true);
     try {
-      await ajusterScore(pseudo, -POINTS.capeCout);
-      const nb = (joueur.inventaire?.capeInvisibilite || 0) + 1;
-      await mettreAJourJoueur(pseudo, { 'inventaire.capeInvisibilite': nb });
-      afficherMessage('Cape d\'Invisibilité achetée. Elle annulera automatiquement la prochaine accusation validée contre toi.');
+      await ajusterScore(pseudo, -POINTS.indiceCout);
+      setIndiceResultat({ cible: cibleIndice, difficulte: cibleData.missionActive.difficulte });
+      setCibleIndice('');
     } finally {
       setChargement(false);
     }
@@ -57,6 +71,7 @@ export default function Boutique() {
       await ajusterScore(pseudo, -POINTS.gelCout);
       const dans24h = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       await mettreAJourJoueur(cibleGel, { geleJusqua: dans24h });
+      await ajouterEvenement(`${cibleGel} a été gelé(e) au Casino pendant 24h.`);
       afficherMessage(`Gel des Avoirs appliqué à ${cibleGel} pour 24h.`);
       setCibleGel('');
     } finally {
@@ -73,8 +88,40 @@ export default function Boutique() {
     try {
       await ajusterScore(pseudo, -POINTS.sabotageCout);
       await sabrerMissionCible(cibleSabotage, cibleData.missionActive.missionId);
+      await ajouterEvenement(`${cibleSabotage} a été saboté(e) — nouvelle mission forcée.`);
       afficherMessage(`Sabotage appliqué : ${cibleSabotage} va recevoir une nouvelle mission aléatoire.`);
       setCibleSabotage('');
+    } finally {
+      setChargement(false);
+    }
+  }
+
+  async function acheterUsurpation() {
+    if (!cibleUsurpation) return afficherMessage('Choisis une cible.');
+    if (solde < POINTS.usurpationCout) return afficherMessage('Solde insuffisant.');
+    const cibleData = tousJoueurs[cibleUsurpation];
+    if (!cibleData?.missionActive) return afficherMessage(`${cibleUsurpation} n'a pas de mission active en ce moment.`);
+    setChargement(true);
+    try {
+      await ajusterScore(pseudo, -POINTS.usurpationCout);
+      await ajouterEvenement(`La difficulté de la mission de ${cibleUsurpation} a été dévoilée : ${cibleData.missionActive.difficulte.toUpperCase()}.`);
+      afficherMessage(`Usurpation appliquée : la difficulté de la mission de ${cibleUsurpation} est maintenant publique dans le Journal.`);
+      setCibleUsurpation('');
+    } finally {
+      setChargement(false);
+    }
+  }
+
+  async function acheterRalentissement() {
+    if (!cibleRalentissement) return afficherMessage('Choisis une cible.');
+    if (solde < POINTS.ralentissementCout) return afficherMessage('Solde insuffisant.');
+    setChargement(true);
+    try {
+      await ajusterScore(pseudo, -POINTS.ralentissementCout);
+      await mettreAJourJoueur(cibleRalentissement, { prochaineMissionForceeDifficile: 'difficile' });
+      await ajouterEvenement(`${cibleRalentissement} doit maintenant affronter une mission DIFFICILE forcée.`);
+      afficherMessage(`Ralentissement appliqué : la prochaine mission de ${cibleRalentissement} sera difficile.`);
+      setCibleRalentissement('');
     } finally {
       setChargement(false);
     }
@@ -86,23 +133,37 @@ export default function Boutique() {
       {message && <div className="toast-message">{message}</div>}
 
       <div className="boutique-item">
-        <h3>🧠 Amnésie — 10 pts</h3>
-        <p>Permet d'abandonner ta mission active sans subir la pénalité de -5 pts.</p>
-        <button className="btn btn-primary" onClick={acheterAmnesie} disabled={chargement || solde < POINTS.amnesieCout}>
+        <h3>🧠 Amnésie — {POINTS.amnesieCout} pts</h3>
+        <p>
+          Active une protection pour toute la journée. Si une accusation contre toi s'avère juste
+          au Tribunal de ce soir, tu pourras choisir de l'annuler : personne ne gagne ni ne perd de
+          points sur cette accusation-là. Une seule active à la fois.
+        </p>
+        {amnesieActive && <p className="dashboard-note">✅ Déjà active pour aujourd'hui.</p>}
+        <button className="btn btn-primary" onClick={acheterAmnesie} disabled={chargement || solde < POINTS.amnesieCout || amnesieActive}>
           Acheter
         </button>
       </div>
 
       <div className="boutique-item">
-        <h3>🥷 Cape d'Invisibilité — 25 pts</h3>
-        <p>Annule automatiquement la prochaine accusation validée contre toi au Tribunal. Ton accusateur perd quand même ses points. {!capeAchetable && '(Achat fermé entre 21h00 et minuit)'}</p>
-        <button className="btn btn-primary" onClick={acheterCape} disabled={chargement || solde < POINTS.capeCout || !capeAchetable}>
+        <h3>🔍 Indice — {POINTS.indiceCout} pts</h3>
+        <p>Révèle uniquement la difficulté (facile/moyenne/difficile) de la mission active d'un joueur, sans révéler son texte. Reste connu de toi seul.</p>
+        <select className="form-select" value={cibleIndice} onChange={(e) => setCibleIndice(e.target.value)}>
+          <option value="">-- Choisir une cible --</option>
+          {autresJoueurs.map((j) => <option key={j} value={j}>{j}</option>)}
+        </select>
+        <button className="btn btn-primary" onClick={acheterIndice} disabled={chargement || solde < POINTS.indiceCout}>
           Acheter
         </button>
+        {indiceResultat && (
+          <div className="confirmation-box">
+            <p>La mission active de <strong>{indiceResultat.cible}</strong> est de difficulté <strong>{indiceResultat.difficulte.toUpperCase()}</strong>.</p>
+          </div>
+        )}
       </div>
 
       <div className="boutique-item">
-        <h3>🧊 Gel des Avoirs — 30 pts</h3>
+        <h3>🧊 Gel des Avoirs — {POINTS.gelCout} pts</h3>
         <p>Bloque l'accès au Casino d'un joueur ciblé pendant 24h.</p>
         <select className="form-select" value={cibleGel} onChange={(e) => setCibleGel(e.target.value)}>
           <option value="">-- Choisir une cible --</option>
@@ -114,13 +175,37 @@ export default function Boutique() {
       </div>
 
       <div className="boutique-item">
-        <h3>💣 Sabotage — 40 pts</h3>
+        <h3>🐌 Ralentissement — {POINTS.ralentissementCout} pts</h3>
+        <p>La prochaine mission piochée par un joueur ciblé sera forcément difficile. Il pourra toujours l'abandonner normalement.</p>
+        <select className="form-select" value={cibleRalentissement} onChange={(e) => setCibleRalentissement(e.target.value)}>
+          <option value="">-- Choisir une cible --</option>
+          {autresJoueurs.map((j) => <option key={j} value={j}>{j}</option>)}
+        </select>
+        <button className="btn btn-danger" onClick={acheterRalentissement} disabled={chargement || solde < POINTS.ralentissementCout}>
+          Acheter
+        </button>
+      </div>
+
+      <div className="boutique-item">
+        <h3>💣 Sabotage — {POINTS.sabotageCout} pts</h3>
         <p>Force instantanément un joueur ciblé à défausser sa mission actuelle pour une mission aléatoire.</p>
         <select className="form-select" value={cibleSabotage} onChange={(e) => setCibleSabotage(e.target.value)}>
           <option value="">-- Choisir une cible --</option>
           {autresJoueurs.map((j) => <option key={j} value={j}>{j}</option>)}
         </select>
         <button className="btn btn-danger" onClick={acheterSabotage} disabled={chargement || solde < POINTS.sabotageCout}>
+          Acheter
+        </button>
+      </div>
+
+      <div className="boutique-item">
+        <h3>🎭 Usurpation — {POINTS.usurpationCout} pts</h3>
+        <p>Révèle publiquement dans le Journal la difficulté de la mission active d'un joueur ciblé. Personne ne saura que c'est toi qui l'as fait.</p>
+        <select className="form-select" value={cibleUsurpation} onChange={(e) => setCibleUsurpation(e.target.value)}>
+          <option value="">-- Choisir une cible --</option>
+          {autresJoueurs.map((j) => <option key={j} value={j}>{j}</option>)}
+        </select>
+        <button className="btn btn-danger" onClick={acheterUsurpation} disabled={chargement || solde < POINTS.usurpationCout}>
           Acheter
         </button>
       </div>

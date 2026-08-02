@@ -4,6 +4,7 @@ import { ecouterJournalEnAttente, cloturerEntreeJournal } from '../../firebase/j
 import { ecouterAccusationsEnAttente, traiterAccusation, traiterAccusationRedondante } from '../../firebase/accusations';
 import { ajusterScore, mettreAJourJoueur, retirerMissionActive } from '../../firebase/joueurs';
 import { bruleMission } from '../../firebase/missions';
+import { ajouterEvenement } from '../../firebase/evenements';
 import { POINTS, heureDecimale, HEURE_DEBUT_TRIBUNAL, HEURE_FIN_TRIBUNAL } from '../../utils/constants';
 import { useEffect } from 'react';
 
@@ -62,18 +63,6 @@ export default function Tribunal() {
   async function jugerAccusationValidee() {
     if (!accusationOuverte) return;
     const accuseData = tousJoueurs[accusationOuverte.accuse];
-    const capeDispo = (accuseData?.inventaire?.capeInvisibilite || 0) > 0;
-
-    if (capeDispo) {
-      // La cape annule l'accusation contre l'accusé, mais l'accusateur perd quand même ses points
-      await mettreAJourJoueur(accusationOuverte.accuse, {
-        'inventaire.capeInvisibilite': accuseData.inventaire.capeInvisibilite - 1,
-      });
-      await ajusterScore(accusationOuverte.accusateur, POINTS.fausseAccusation);
-      await traiterAccusation(accusationOuverte.id, 'annulee_cape');
-      setAccusationOuverte(null);
-      return;
-    }
 
     const missionActiveAccuse = accuseData?.missionActive;
     const pointsMission = missionActiveAccuse?.points || 0;
@@ -91,6 +80,7 @@ export default function Tribunal() {
     await retirerMissionActive(accusationOuverte.accuse);
 
     await traiterAccusation(accusationOuverte.id, 'validee');
+    await ajouterEvenement(`${accusationOuverte.accuse} a été démasqué(e) au Tribunal.`);
     setAccusationOuverte(null);
   }
 
@@ -101,6 +91,24 @@ export default function Tribunal() {
     // L'accusateur touche un bonus fixe, puisque la mission n'a rapporté aucun point à l'accusé.
     await ajusterScore(accusationOuverte.accusateur, 10);
     await traiterAccusation(accusationOuverte.id, 'validee_mission_abandonnee');
+    setAccusationOuverte(null);
+  }
+
+  async function jugerAccusationValideeAvecAmnesie() {
+    if (!accusationOuverte) return;
+    const accuseData = tousJoueurs[accusationOuverte.accuse];
+    const missionActiveAccuse = accuseData?.missionActive;
+
+    // Neutre : personne ne gagne ni ne perd de points. La mission reste tout de même
+    // démasquée (brûlée + retirée), puisqu'elle a été révélée au grand jour au Tribunal.
+    if (missionActiveAccuse?.missionId) {
+      await bruleMission(missionActiveAccuse.missionId);
+    }
+    await retirerMissionActive(accusationOuverte.accuse);
+    // L'Amnésie est consommée : elle ne protège qu'une seule fois par jour.
+    await mettreAJourJoueur(accusationOuverte.accuse, { amnesieActiveJusqua: null });
+
+    await traiterAccusation(accusationOuverte.id, 'validee_amnesie');
     setAccusationOuverte(null);
   }
 
@@ -206,9 +214,11 @@ export default function Tribunal() {
       </section>
 
       {accusationOuverte && (() => {
-        const missionActiveAccuse = tousJoueurs[accusationOuverte.accuse]?.missionActive;
+        const accuseData = tousJoueurs[accusationOuverte.accuse];
+        const missionActiveAccuse = accuseData?.missionActive;
         const derniereEntree = derniereEntreeJournalPour(accusationOuverte.accuse);
         const missionAbandonneeDetectee = !missionActiveAccuse && derniereEntree?.type === 'abandonnee';
+        const amnesieActive = accuseData?.amnesieActiveJusqua && new Date(accuseData.amnesieActiveJusqua) > new Date();
 
         return (
           <div className="modal-overlay" onClick={() => setAccusationOuverte(null)}>
@@ -256,6 +266,13 @@ export default function Tribunal() {
                 </p>
               )}
 
+              {amnesieActive && (
+                <p className="warning-text">
+                  🧠 {accusationOuverte.accuse} a une Amnésie active aujourd'hui. Demande à voix haute :
+                  veut-il/elle l'utiliser sur CETTE accusation précise ?
+                </p>
+              )}
+
               <div className="mission-actions" style={{ flexDirection: 'column' }}>
                 <button className="btn btn-secondary" onClick={jugerFausseAccusation}>
                   Fausse accusation (-10 pts accusateur)
@@ -263,6 +280,11 @@ export default function Tribunal() {
                 <button className="btn btn-success" onClick={jugerAccusationValidee}>
                   Accusation validée (accusé perd mission + 10, accusateur vole le pactole)
                 </button>
+                {amnesieActive && (
+                  <button className="btn btn-primary" onClick={jugerAccusationValideeAvecAmnesie}>
+                    🧠 Oui, Amnésie utilisée ici (neutre pour les deux, mission quand même révélée)
+                  </button>
+                )}
                 {missionAbandonneeDetectee && (
                   <button className="btn btn-success" onClick={jugerAccusationValideeSurAbandon}>
                     Accusation validée — mission déjà abandonnée (+10 pts fixes accusateur, aucun malus accusé)

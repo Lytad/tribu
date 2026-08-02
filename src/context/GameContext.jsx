@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { assurerJoueur, ecouterJoueur, ecouterTousJoueurs } from '../firebase/joueurs';
 import { ecouterForceRefresh } from '../firebase/godmode';
-import { saisonActuelle } from '../utils/constants';
+import { ajouterEvenement } from '../firebase/evenements';
+import { saisonActuelle, ADMIN_PSEUDO } from '../utils/constants';
 
 const GameContext = createContext(null);
 
@@ -13,6 +14,7 @@ export function GameProvider({ children }) {
   const [tousJoueurs, setTousJoueurs] = useState({});
   const [chargement, setChargement] = useState(true);
   const [saison, setSaison] = useState(() => saisonActuelle());
+  const dernierLeaderRef = useRef(null);
 
   // Bascule automatique de saison, vérifiée chaque minute
   useEffect(() => {
@@ -46,6 +48,27 @@ export function GameProvider({ children }) {
     const unsub = ecouterTousJoueurs(setTousJoueurs);
     return unsub;
   }, []);
+
+  // Détection du changement de leader — uniquement depuis le compte AD, pour éviter que
+  // chaque téléphone connecté ne génère le même événement en double dans le Journal.
+  useEffect(() => {
+    if (pseudo !== ADMIN_PSEUDO) return;
+    const classement = Object.entries(tousJoueurs)
+      .map(([p, data]) => ({ pseudo: p, score: data.score || 0 }))
+      .sort((a, b) => b.score - a.score);
+    if (classement.length === 0) return;
+    const leaderActuel = classement[0].pseudo;
+    if (dernierLeaderRef.current === null) {
+      // Premier calcul depuis l'ouverture de l'app : on mémorise sans déclencher d'événement,
+      // pour ne pas spammer le Journal à chaque rechargement de page.
+      dernierLeaderRef.current = leaderActuel;
+      return;
+    }
+    if (leaderActuel !== dernierLeaderRef.current) {
+      dernierLeaderRef.current = leaderActuel;
+      ajouterEvenement(`${leaderActuel} est passé(e) en tête du classement !`);
+    }
+  }, [tousJoueurs, pseudo]);
 
   function connecter(nouveauPseudo) {
     localStorage.setItem(STORAGE_KEY, nouveauPseudo);

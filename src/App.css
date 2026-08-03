@@ -693,3 +693,38 @@
 .stats-titre-valeur {
   font-size: 14px;
 }
+.stats-detail-titre {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin: 18px 0 10px;
+  font-weight: 700;
+}
+
+.stats-detail-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stats-detail-carte {
+  background: var(--bg-card-2);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.stats-detail-nom {
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--primary);
+  margin-bottom: 6px;
+}
+
+.stats-detail-lignes {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--text);
+}

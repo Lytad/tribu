@@ -21,6 +21,7 @@ export async function assurerJoueur(pseudo) {
       geleJusqua: null, // timestamp ISO si Gel des Avoirs actif
       casinoBeneficeJour: 0,
       casinoDateJour: null, // pour reset quotidien
+      nombrePartiesCasino: 0, // compteur cumulé, utilisé pour les statistiques de fin de saison
       createdAt: new Date().toISOString(),
     });
     await ajouterEvenement(`${pseudo} a rejoint la partie.`);

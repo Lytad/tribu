@@ -34,13 +34,14 @@ const SECTIONS = [
       </>
     ),
   },
-  {
+ {
     id: 'calendrier',
     titre: '📅 Le calendrier',
     contenu: (
       <>
         <p><strong>Saison 1 (du 6 au 9 août)</strong> — Mattia, Hilaire et AD s'affrontent en petit comité.</p>
-        <p><strong>Saison 2 (du 10 au 16 août)</strong> — Tiphaine, Alex et Léane rejoignent la partie. Le jeu s'ouvre automatiquement à minuit le 10 août, sans aucune action nécessaire.</p>
+        <p><strong>Saison 2 (du 10 août 10h au 16 août 12h)</strong> — Tiphaine, Alex et Léane rejoignent la partie. Le jeu s'ouvre automatiquement à 10h le 10 août, sans aucune action nécessaire. Les scores de Mattia, Hilaire et AD repartent alors à zéro (40 points), comme tous les nouveaux joueurs.</p>
+        <p><strong>Fin de partie (16 août à 12h)</strong> — plus aucune mission, accusation, achat en boutique ou partie de Casino n'est possible après cette heure. Les statistiques finales de la Saison 2 sont alors disponibles dans l'onglet 📊.</p>
         <p>Chaque nouveau joueur démarre avec un solde de départ de <strong>40 points</strong>.</p>
       </>
     ),

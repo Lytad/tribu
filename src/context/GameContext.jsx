@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { assurerJoueur, ecouterJoueur, ecouterTousJoueurs, mettreAJourJoueur } from '../firebase/joueurs';
 import { remettreDisponible } from '../firebase/missions';
 import { ecouterForceRefresh, tenterVerrouResetSaison2 } from '../firebase/godmode';
+import { calculerEtFigerStatistiquesSaison1 } from '../firebase/statistiques';
 import { ajouterEvenement } from '../firebase/evenements';
 import { ecouterJoueurTest, ecouterTousJoueursTest } from '../firebase/sandbox';
 import { saisonActuelle, ADMIN_PSEUDO, JOUEURS_SAISON_1 } from '../utils/constants';
@@ -104,6 +105,13 @@ export function GameProvider({ children }) {
     if (pseudo !== ADMIN_PSEUDO || modeTest || saison !== 2) return;
     tenterVerrouResetSaison2().then(async (verrouObtenu) => {
       if (!verrouObtenu) return;
+
+      // On capture les scores et compteurs AVANT toute réinitialisation, pour figer des
+      // statistiques fidèles à l'état réel de fin de Saison 1.
+      const scoresFinaux = {};
+      JOUEURS_SAISON_1.forEach((p) => { scoresFinaux[p] = tousJoueurs[p]?.score ?? 0; });
+      await calculerEtFigerStatistiquesSaison1(scoresFinaux, tousJoueurs);
+
       for (const p of JOUEURS_SAISON_1) {
         const missionEnCours = tousJoueurs[p]?.missionActive;
         if (missionEnCours?.missionId) {
@@ -153,7 +161,7 @@ export function GameProvider({ children }) {
     entrerModeTest,
     quitterModeTest,
     setPseudoTest,
-    pseudoReelAdmin: pseudo, // conserve le vrai pseudo (AD) pour savoir qui a le droit d'activer/quitter
+    pseudoReelAdmin: pseudo,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

@@ -15,7 +15,7 @@ function finDeJournee() {
 }
 
 export default function Boutique() {
-  const { pseudo, joueur, tousJoueurs, modeTest } = useGame();
+  const { pseudo, joueur, tousJoueurs, modeTest, estPartieTerminee } = useGame();
   const [cibleGel, setCibleGel] = useState('');
   const [cibleSabotage, setCibleSabotage] = useState('');
   const [cibleIndice, setCibleIndice] = useState('');
@@ -142,6 +142,12 @@ export default function Boutique() {
 
   return (
     <div className="boutique-screen">
+      {estPartieTerminee ? (
+        <div className="mission-card">
+          <p className="empty-state">🏁 La partie est terminée. Retrouve les statistiques finales dans l'onglet 📊.</p>
+        </div>
+      ) : (
+        <>
       <div className="solde-header">Ton solde : <strong>{solde} pts</strong></div>
       {message && <div className="toast-message">{message}</div>}
 
@@ -222,6 +228,8 @@ export default function Boutique() {
           Acheter
         </button>
       </div>
+        </>
+      )}
     </div>
   );
 }

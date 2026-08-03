@@ -38,3 +38,14 @@ export async function tenterVerrouResetSaison2() {
     return true;
   });
 }
+
+// Même principe pour le calcul figé des statistiques de fin de partie (16 août 12h).
+export async function tenterVerrouFinDePartie() {
+  return runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(systemRef);
+    const dejaFait = snap.exists() && snap.data().finDePartieFaite;
+    if (dejaFait) return false;
+    transaction.set(systemRef, { finDePartieFaite: true }, { merge: true });
+    return true;
+  });
+}

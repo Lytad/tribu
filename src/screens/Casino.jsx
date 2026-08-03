@@ -47,6 +47,7 @@ export default function Casino() {
       await fn.mettreAJourJoueur(pseudo, {
         casinoDateJour: jourCourant,
         casinoBeneficeJour: nouveauBenefice,
+        nombrePartiesCasino: (joueur?.nombrePartiesCasino || 0) + 1,
       });
 
       setResultat({ victoire, delta, gain });

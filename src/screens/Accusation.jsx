@@ -5,7 +5,7 @@ import { creerAccusationTest, TEST_JOUEURS } from '../firebase/sandbox';
 import { TOUS_JOUEURS, heureDecimale, HEURE_FIN_ACCUSATIONS } from '../utils/constants';
 
 export default function Accusation() {
-  const { pseudo, tousJoueurs, modeTest } = useGame();
+  const { pseudo, tousJoueurs, modeTest, estPartieTerminee } = useGame();
   const [cible, setCible] = useState('');
   const [description, setDescription] = useState('');
   const [envoyee, setEnvoyee] = useState(false);
@@ -30,6 +30,16 @@ export default function Accusation() {
     } finally {
       setEnvoi(false);
     }
+  }
+
+  if (estPartieTerminee) {
+    return (
+      <div className="accusation-screen">
+        <div className="mission-card">
+          <p className="empty-state">🏁 La partie est terminée. Retrouve les statistiques finales dans l'onglet 📊.</p>
+        </div>
+      </div>
+    );
   }
 
   if (!fenetreOuverte) {

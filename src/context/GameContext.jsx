@@ -1,11 +1,11 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { assurerJoueur, ecouterJoueur, ecouterTousJoueurs, mettreAJourJoueur } from '../firebase/joueurs';
 import { remettreDisponible } from '../firebase/missions';
-import { ecouterForceRefresh, tenterVerrouResetSaison2 } from '../firebase/godmode';
-import { calculerEtFigerStatistiquesSaison1 } from '../firebase/statistiques';
+import { ecouterForceRefresh, tenterVerrouResetSaison2, tenterVerrouFinDePartie } from '../firebase/godmode';
+import { calculerEtFigerStatistiquesSaison1, calculerEtFigerStatistiquesSaison2 } from '../firebase/statistiques';
 import { ajouterEvenement } from '../firebase/evenements';
 import { ecouterJoueurTest, ecouterTousJoueursTest } from '../firebase/sandbox';
-import { saisonActuelle, ADMIN_PSEUDO, JOUEURS_SAISON_1 } from '../utils/constants';
+import { saisonActuelle, partieTerminee, ADMIN_PSEUDO, JOUEURS_SAISON_1, TOUS_JOUEURS } from '../utils/constants';
 
 const GameContext = createContext(null);
 
@@ -17,6 +17,7 @@ export function GameProvider({ children }) {
   const [tousJoueurs, setTousJoueurs] = useState({});
   const [chargement, setChargement] = useState(true);
   const [saison, setSaison] = useState(() => saisonActuelle());
+  const [estPartieTerminee, setEstPartieTerminee] = useState(() => partieTerminee());
   const dernierLeaderRef = useRef(null);
 
   // Mode test (Bac à Sable) : bascule toute l'app sur les données isolées de test.
@@ -24,9 +25,12 @@ export function GameProvider({ children }) {
   const [modeTest, setModeTest] = useState(false);
   const [pseudoTest, setPseudoTestState] = useState('TEST1');
 
-  // Bascule automatique de saison, vérifiée chaque minute
+  // Bascule automatique de saison et de fin de partie, vérifiée chaque minute
   useEffect(() => {
-    const interval = setInterval(() => setSaison(saisonActuelle()), 60000);
+    const interval = setInterval(() => {
+      setSaison(saisonActuelle());
+      setEstPartieTerminee(partieTerminee());
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -124,6 +128,20 @@ export function GameProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saison, pseudo, modeTest]);
 
+  // Calcul figé des statistiques de la Saison 2 à la fin de partie (16 août 12h). Même
+  // principe de verrou que pour la Saison 1, déclenché uniquement depuis le compte AD.
+  useEffect(() => {
+    if (pseudo !== ADMIN_PSEUDO || modeTest || !estPartieTerminee) return;
+    tenterVerrouFinDePartie().then(async (verrouObtenu) => {
+      if (!verrouObtenu) return;
+      const scoresFinaux = {};
+      TOUS_JOUEURS.forEach((p) => { scoresFinaux[p] = tousJoueurs[p]?.score ?? 0; });
+      await calculerEtFigerStatistiquesSaison2(scoresFinaux, tousJoueurs);
+      await ajouterEvenement('La partie est terminée — les statistiques finales de la Saison 2 sont disponibles !');
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estPartieTerminee, pseudo, modeTest]);
+
   function connecter(nouveauPseudo) {
     localStorage.setItem(STORAGE_KEY, nouveauPseudo);
     setPseudoState(nouveauPseudo);
@@ -154,6 +172,7 @@ export function GameProvider({ children }) {
     tousJoueurs,
     chargement,
     saison: modeTest ? 1 : saison,
+    estPartieTerminee: modeTest ? false : estPartieTerminee,
     connecter,
     deconnecter,
     modeTest,
@@ -161,7 +180,7 @@ export function GameProvider({ children }) {
     entrerModeTest,
     quitterModeTest,
     setPseudoTest,
-    pseudoReelAdmin: pseudo,
+    pseudoReelAdmin: pseudo, // conserve le vrai pseudo (AD) pour savoir qui a le droit d'activer/quitter
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

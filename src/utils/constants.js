@@ -1,6 +1,7 @@
 // Dates de bascule des saisons (heure locale du joueur)
 export const SAISON_1_DEBUT = new Date('2026-08-06T00:00:00');
-export const SAISON_2_DEBUT = new Date('2026-08-10T00:00:00');
+export const SAISON_2_DEBUT = new Date('2026-08-10T10:00:00');
+export const FIN_DE_PARTIE = new Date('2026-08-16T12:00:00');
 
 export const JOUEURS_SAISON_1 = ['Mattia', 'Hilaire', 'AD'];
 export const JOUEURS_SAISON_2_AJOUT = ['Tiphaine', 'Alex', 'Léane'];
@@ -45,6 +46,10 @@ export function saisonActuelle(date = new Date()) {
   if (date >= SAISON_2_DEBUT) return 2;
   if (date >= SAISON_1_DEBUT) return 1;
   return 0; // pas encore commencé
+}
+
+export function partieTerminee(date = new Date()) {
+  return date >= FIN_DE_PARTIE;
 }
 
 export function heureDecimale(date = new Date()) {

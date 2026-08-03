@@ -602,3 +602,94 @@
 .regles-section-contenu strong {
   color: var(--primary);
 }
+
+/* Écran Statistiques — palmarès de fin de saison */
+.stats-screen {
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.stats-saison-bloc {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.stats-saison-titre {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0 0 14px;
+  color: var(--primary);
+}
+
+.stats-classement {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.stats-classement-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.stats-classement-rang {
+  font-weight: 900;
+  width: 30px;
+  text-align: center;
+}
+
+.stats-classement-nom {
+  flex: 1;
+  font-weight: 700;
+}
+
+.stats-classement-score {
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.stats-titres {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stats-titre-carte {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card-2);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.stats-titre-emoji {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.stats-titre-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.stats-titre-valeur {
+  font-size: 14px;
+}

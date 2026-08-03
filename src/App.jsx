@@ -8,6 +8,7 @@ import Boutique from './screens/Boutique';
 import Casino from './screens/Casino';
 import Journal from './screens/Journal';
 import Regles from './screens/Regles';
+import Statistiques from './screens/Statistiques';
 import AdminPin from './screens/admin/AdminPin';
 import Tribunal from './screens/admin/Tribunal';
 import GodMode from './screens/admin/GodMode';
@@ -32,6 +33,7 @@ function AppContent() {
   const [adminDeverrouille, setAdminDeverrouille] = useState(false);
   const [pinOuvert, setPinOuvert] = useState(false);
   const [reglesOuvertes, setReglesOuvertes] = useState(false);
+  const [statsOuvertes, setStatsOuvertes] = useState(false);
   const [vueAdmin, setVueAdmin] = useState('tribunal'); // 'tribunal' | 'godmode'
 
   if (!pseudo) return <Login />;
@@ -69,6 +71,17 @@ function AppContent() {
     </div>
   );
 
+  const modaleStats = statsOuvertes && (
+    <div className="modal-overlay" onClick={() => setStatsOuvertes(false)}>
+      <div className="modal-content modal-content-large" onClick={(e) => e.stopPropagation()}>
+        <Statistiques />
+        <button className="btn btn-secondary" onClick={() => setStatsOuvertes(false)} style={{ marginTop: 16 }}>
+          Fermer
+        </button>
+      </div>
+    </div>
+  );
+
   if (estAdmin && adminDeverrouille) {
     return (
       <div className="app-shell">
@@ -85,6 +98,7 @@ function AppContent() {
           {vueAdmin === 'tribunal' ? <Tribunal /> : <GodMode />}
         </main>
         {modaleRegles}
+        {modaleStats}
       </div>
     );
   }
@@ -95,6 +109,7 @@ function AppContent() {
       <header className="app-header">
         <span className="app-header-title">TRIBU</span>
         <div className="app-header-actions">
+          <button className="btn-regles" onClick={() => setStatsOuvertes(true)}>📊</button>
           <button className="btn-regles" onClick={() => setReglesOuvertes(true)}>📖</button>
           <span className="app-header-score">{joueur.score || 0} pts</span>
         </div>
@@ -137,6 +152,7 @@ function AppContent() {
       )}
 
       {modaleRegles}
+      {modaleStats}
     </div>
   );
 }

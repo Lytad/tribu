@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useGame } from '../../context/GameContext';
 import { ajusterScore, retirerMissionActive } from '../../firebase/joueurs';
-import { initialiserMissions, verifierBaseInitialisee, ecouterStatsMissions, remettreDisponible } from '../../firebase/missions';
+import { initialiserMissions, verifierBaseInitialisee, ecouterStatsMissions, remettreDisponible, ajouterMissionPersonnalisee } from '../../firebase/missions';
 import { declencherForceRefresh } from '../../firebase/godmode';
 import { ecouterAccusationsEnAttente, supprimerAccusationBug } from '../../firebase/accusations';
 import {
@@ -24,6 +24,11 @@ export default function GodMode() {
   const [bacASableInitialise, setBacASableInitialise] = useState(null);
   const [statsBacASable, setStatsBacASable] = useState(null);
   const [chargementBacASable, setChargementBacASable] = useState(false);
+  const [nouvelleSaison, setNouvelleSaison] = useState('1');
+  const [nouvelleDifficulte, setNouvelleDifficulte] = useState('facile');
+  const [nouveauTexte, setNouveauTexte] = useState('');
+  const [nouvellePreuveRequise, setNouvellePreuveRequise] = useState(false);
+  const [ajoutEnCours, setAjoutEnCours] = useState(false);
 
   useEffect(() => {
     verifierBaseInitialisee().then(setBaseInitialisee);
@@ -63,6 +68,27 @@ export default function GodMode() {
   function afficherMessage(txt) {
     setMessage(txt);
     setTimeout(() => setMessage(null), 4000);
+  }
+
+  const POINTS_PAR_DIFFICULTE = { facile: 10, moyenne: 20, difficile: 40 };
+
+  async function soumettreNouvelleMission() {
+    if (!nouveauTexte.trim()) return afficherMessage('Le texte de la mission ne peut pas être vide.');
+    setAjoutEnCours(true);
+    try {
+      await ajouterMissionPersonnalisee({
+        saison: Number(nouvelleSaison),
+        difficulte: nouvelleDifficulte,
+        points: POINTS_PAR_DIFFICULTE[nouvelleDifficulte],
+        texte: nouveauTexte.trim(),
+        preuveRequise: nouvellePreuveRequise,
+      });
+      afficherMessage('Nouvelle mission ajoutée à la base, disponible immédiatement.');
+      setNouveauTexte('');
+      setNouvellePreuveRequise(false);
+    } finally {
+      setAjoutEnCours(false);
+    }
   }
 
   async function lancerInitialisation() {
@@ -172,6 +198,49 @@ export default function GodMode() {
         {progression && (
           <p>Chargement : {progression.done} / {progression.total}</p>
         )}
+      </section>
+
+      <section className="tribunal-section">
+        <h3>➕ Ajouter une mission</h3>
+        <p className="dashboard-note">
+          Pour compléter la base en cours de partie si les missions viennent à manquer.
+          N'affecte jamais les 430 missions existantes ni leur statut actuel.
+        </p>
+
+        <label className="form-label">Saison</label>
+        <select className="form-select" value={nouvelleSaison} onChange={(e) => setNouvelleSaison(e.target.value)}>
+          <option value="1">Saison 1</option>
+          <option value="2">Saison 2</option>
+        </select>
+
+        <label className="form-label">Difficulté</label>
+        <select className="form-select" value={nouvelleDifficulte} onChange={(e) => setNouvelleDifficulte(e.target.value)}>
+          <option value="facile">Facile (10 pts)</option>
+          <option value="moyenne">Moyenne (20 pts)</option>
+          <option value="difficile">Difficile (40 pts)</option>
+        </select>
+
+        <label className="form-label">Texte de la mission</label>
+        <textarea
+          className="form-textarea"
+          placeholder="Décris la mission..."
+          value={nouveauTexte}
+          onChange={(e) => setNouveauTexte(e.target.value)}
+          rows={3}
+        />
+
+        <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={nouvellePreuveRequise}
+            onChange={(e) => setNouvellePreuveRequise(e.target.checked)}
+          />
+          Preuve (photo/vidéo) requise pour cette mission
+        </label>
+
+        <button className="btn btn-primary" onClick={soumettreNouvelleMission} disabled={ajoutEnCours || !nouveauTexte.trim()}>
+          Ajouter cette mission
+        </button>
       </section>
 
       <section className="tribunal-section">

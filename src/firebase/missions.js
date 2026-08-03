@@ -1,11 +1,33 @@
 import {
-  doc, getDocs, getDoc, updateDoc, query, collection, where, writeBatch, onSnapshot, limit, runTransaction,
+  doc, getDocs, getDoc, setDoc, updateDoc, query, collection, where, writeBatch, onSnapshot, limit, runTransaction,
 } from 'firebase/firestore';
 import { db } from './config';
 import missionsSeed from '../data/missions.seed.json';
 import { mettreAJourJoueur, retirerMissionActive } from './joueurs';
 
 const missionsRef = collection(db, 'missions');
+
+// Ajoute UNE mission personnalisée à la base existante, sans toucher aux 430 missions déjà
+// en place ni à leurs statuts actuels. L'ID généré (préfixe CUSTOM-) ne peut jamais entrer
+// en collision avec les IDs du seed d'origine (format S<saison>-<difficulte>-<numero>).
+export async function ajouterMissionPersonnalisee({
+  saison, difficulte, points, texte, preuveRequise,
+}) {
+  const id = `CUSTOM-${Date.now()}`;
+  await setDoc(doc(missionsRef, id), {
+    id,
+    saison,
+    difficulte,
+    points,
+    texte,
+    preuveRequise: !!preuveRequise,
+    statut: 'disponible',
+    joueurActuel: null,
+    joueursExclus: [],
+    nombreAbandons: 0,
+  });
+  return id;
+}
 
 // À appeler UNE SEULE FOIS (bouton God Mode "Initialiser la base de missions")
 // Écrit les 430 missions dans Firestore par lots de 400 max (limite Firestore par batch = 500)

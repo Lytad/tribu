@@ -15,7 +15,7 @@ const LABELS_DIFFICULTE = { facile: 'Facile', moyenne: 'Moyenne', difficile: 'Di
 const LABELS_DIFFICULTE_MAJ = { facile: 'FACILE', moyenne: 'MOYENNE', difficile: 'DIFFICILE' };
 
 export default function Missions() {
-  const { pseudo, joueur, saison, modeTest } = useGame();
+  const { pseudo, joueur, saison, modeTest, estPartieTerminee } = useGame();
   const [propositionCourante, setPropositionCourante] = useState(null);
   const [chargementAction, setChargementAction] = useState(false);
   const [erreur, setErreur] = useState(null);
@@ -44,11 +44,11 @@ export default function Missions() {
 
   // Si aucune mission active et aucune proposition en attente, on pioche automatiquement
   useEffect(() => {
-    if (!missionActive && !propositionCourante && (saison > 0 || modeTest)) {
+    if (!missionActive && !propositionCourante && (saison > 0 || modeTest) && !estPartieTerminee) {
       piocher();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [missionActive, saison, modeTest]);
+  }, [missionActive, saison, modeTest, estPartieTerminee]);
 
   async function piocher() {
     setErreur(null);
@@ -172,6 +172,10 @@ export default function Missions() {
 
   if (saison === 0 && !modeTest) {
     return <div className="missions-screen"><p className="empty-state">Le jeu n'a pas encore commencé. Rendez-vous le 6 août !</p></div>;
+  }
+
+  if (estPartieTerminee) {
+    return <div className="missions-screen"><p className="empty-state">🏁 La partie est terminée. Retrouve les statistiques finales dans l'onglet 📊.</p></div>;
   }
 
   return (

@@ -9,7 +9,7 @@ function aujourdhuiStr() {
 }
 
 export default function Casino() {
-  const { pseudo, joueur, modeTest } = useGame();
+  const { pseudo, joueur, modeTest, estPartieTerminee } = useGame();
   const [mise, setMise] = useState('');
   const [resultat, setResultat] = useState(null);
   const [chargement, setChargement] = useState(false);
@@ -55,6 +55,16 @@ export default function Casino() {
     } finally {
       setChargement(false);
     }
+  }
+
+  if (estPartieTerminee) {
+    return (
+      <div className="casino-screen">
+        <div className="mission-card">
+          <p className="empty-state">🏁 La partie est terminée. Retrouve les statistiques finales dans l'onglet 📊.</p>
+        </div>
+      </div>
+    );
   }
 
   if (geleActif) {
